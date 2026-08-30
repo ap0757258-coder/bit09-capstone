@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import Dashboard from './Dashboard';
 
 function App() {
+  const [loggedIn, setLoggedIn] = useState(false);
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
   const [msg, setMsg] = useState('');
@@ -9,7 +11,6 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setMsg('');
     
     try {
       const response = await fetch('http://localhost:8080/api/auth/login', {
@@ -19,10 +20,10 @@ function App() {
       });
       
       if (response.ok) {
-        const data = await response.json();
-        setMsg('✅ Login Successful!');
+        setMsg('✅ Login Successful');
+        setTimeout(() => setLoggedIn(true), 800);
       } else {
-        setMsg('❌ Invalid Credentials!');
+        setMsg('❌ Invalid Credentials');
       }
     } catch (error) {
       setMsg('❌ Error: ' + error.message);
@@ -30,27 +31,73 @@ function App() {
     setLoading(false);
   };
 
+  if (loggedIn) {
+    return <Dashboard />;
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #2563eb, #1e40af)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: '28rem', background: 'white', borderRadius: '0.5rem', boxShadow: '0 20px 25px', padding: '2rem' }}>
-        <h1 style={{ textAlign: 'center', color: '#2563eb', marginBottom: '1rem' }}>KES SHROFF</h1>
-        <h2 style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: '2rem' }}>Student Login</h2>
+    <div style={{ minHeight: '100vh', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ width: '100%', maxWidth: '400px' }}>
+        
+        {/* Header */}
+        <div style={{ marginBottom: '3rem', textAlign: 'center' }}>
+          <h1 style={{ margin: '0', fontSize: '2.5rem', color: '#111827', fontWeight: '700', letterSpacing: '-0.05em' }}>KES SHROFF</h1>
+          <p style={{ margin: '0.5rem 0 0 0', fontSize: '1rem', color: '#6b7280', fontWeight: '500' }}>Document Portal</p>
+          <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#9ca3af' }}>Zero-Trust Credential System</p>
+        </div>
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <input type="text" placeholder="User: test123" value={user} onChange={(e) => setUser(e.target.value)} style={{ padding: '0.75rem', border: '1px solid #ccc', borderRadius: '0.375rem' }} required />
-          
-          <input type="password" placeholder="Pass: test123" value={pass} onChange={(e) => setPass(e.target.value)} style={{ padding: '0.75rem', border: '1px solid #ccc', borderRadius: '0.375rem' }} required />
-          
-          <button type="submit" disabled={loading} style={{ padding: '0.75rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '0.375rem', fontWeight: 'bold', cursor: 'pointer' }}>
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
+        {/* Login Card */}
+        <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '0.5rem', padding: '2rem' }}>
+          <h2 style={{ margin: '0 0 2rem 0', fontSize: '1.5rem', color: '#1f2937', fontWeight: '600', textAlign: 'center' }}>Student Login</h2>
 
-        {msg && <div style={{ marginTop: '1rem', padding: '0.75rem', textAlign: 'center', background: msg.includes('✅') ? '#dcfce7' : '#fee2e2', color: msg.includes('✅') ? '#166534' : '#991b1b', borderRadius: '0.375rem' }}>{msg}</div>}
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.5rem' }}>Enrollment Number</label>
+              <input
+                type="text"
+                placeholder="test123"
+                value={user}
+                onChange={(e) => setUser(e.target.value)}
+                style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }}
+                required
+              />
+            </div>
 
-        <div style={{ marginTop: '1rem', fontSize: '0.75rem', textAlign: 'center', color: '#666' }}>
-          <p>Test User: test123</p>
-          <p>Test Pass: test123</p>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.5rem' }}>Password</label>
+              <input
+                type="password"
+                placeholder="test123"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ width: '100%', padding: '0.75rem', background: '#1f2937', color: '#ffffff', border: 'none', borderRadius: '0.375rem', fontWeight: '600', fontSize: '1rem', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? '0.7' : '1' }}
+            >
+              {loading ? 'Signing in...' : 'Sign in'}
+            </button>
+          </form>
+
+          {msg && (
+            <div style={{ marginTop: '1rem', padding: '0.75rem', background: msg.includes('✅') ? '#f0fdf4' : '#fef2f2', color: msg.includes('✅') ? '#16a34a' : '#dc2626', borderRadius: '0.375rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: '500' }}>
+              {msg}
+            </div>
+          )}
+
+          <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb', fontSize: '0.875rem', color: '#6b7280', textAlign: 'center' }}>
+            Demo: test123 / test123
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.75rem', color: '#9ca3af' }}>
+          <p>© 2026 KES SHROFF COLLEGE | Secure Platform</p>
         </div>
       </div>
     </div>
