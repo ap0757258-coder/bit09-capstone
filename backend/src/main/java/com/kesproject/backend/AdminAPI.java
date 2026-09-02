@@ -21,11 +21,13 @@ public class AdminAPI {
 
     @PostMapping("/approve/{requestId}")
     public Response approveRequest(@PathVariable String requestId, @RequestBody ApprovalPayload payload) {
+        System.out.println(">>> APPROVE HIT: " + requestId + " comment=" + payload.comment);
         return new Response("success", "Request " + requestId + " approved");
     }
 
     @PostMapping("/reject/{requestId}")
     public Response rejectRequest(@PathVariable String requestId, @RequestBody ApprovalPayload payload) {
+        System.out.println(">>> REJECT HIT: " + requestId + " comment=" + payload.comment);
         return new Response("success", "Request " + requestId + " rejected");
     }
 
