@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Dashboard from './Dashboard';
 import AdminDashboard from './AdminDashboard';
+import Verify from './Verify';
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -11,19 +12,22 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Check if we're on verify page
+  const isVerifyPage = window.location.pathname.startsWith('/verify/');
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     
     try {
-      const response = await fetch('http://localhost:8080/api/auth/login', {
+     const response = await fetch('http://localhost:8080/api/auth/login', {
+    
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ u: user, p: pass })
       });
       
       if (response.ok) {
-        // Check if admin login
         if (user === 'admin' && pass === 'admin123') {
           setMsg('✅ Admin Login Successful');
           setUserRole('admin');
@@ -41,6 +45,11 @@ function App() {
     }
     setLoading(false);
   };
+
+  // Show verify page if on /verify route
+  if (isVerifyPage) {
+    return <Verify />;
+  }
 
   if (loggedIn && isAdmin) {
     return <AdminDashboard />;

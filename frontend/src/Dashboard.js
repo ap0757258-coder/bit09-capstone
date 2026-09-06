@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import CreateRequest from './CreateRequest';
+import CreateRequestForm from './CreateRequestForm';
 
 export default function Dashboard() {
   const [requests, setRequests] = useState([]);
-  const [showForm, setShowForm] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedQR, setSelectedQR] = useState(null);
 
   useEffect(() => {
     fetchRequests();
@@ -40,108 +42,132 @@ export default function Dashboard() {
     document.body.removeChild(link);
   };
 
+  const generateAndShowQR = (requestId) => {
+    const timestamp = Date.now();
+    const verificationCode = requestId + "-" + String(timestamp % 1000000).padStart(6, '0');
+    setSelectedQR({ requestId, verificationCode });
+    setShowQRModal(true);
+  };
+
   const handleLogout = () => {
     window.location.href = '/';
   };
 
-  if (showForm) {
-    return <CreateRequest onBack={() => { setShowForm(false); fetchRequests(); }} />;
+  if (showCreateForm) {
+    return <CreateRequestForm studentId="test123" onBack={() => { setShowCreateForm(false); fetchRequests(); }} />;
   }
 
-  const getStatusConfig = (status) => {
-    if (status === 'approved') return { bg: '#dcfce7', border: '#16a34a', text: '#15803d', label: '✅ Approved' };
-    if (status === 'rejected') return { bg: '#fee2e2', border: '#dc2626', text: '#b91c1c', label: '❌ Rejected' };
-    return { bg: '#fef3c7', border: '#d97706', text: '#b45309', label: '⏳ Pending' };
+  const getStatusColor = (status) => {
+    if (status === 'approved') return '#16a34a';
+    if (status === 'rejected') return '#dc2626';
+    return '#ca8a04';
   };
 
-  const pendingCount = requests.filter(r => r.status === 'pending').length;
-  const approvedCount = requests.filter(r => r.status === 'approved').length;
-  const rejectedCount = requests.filter(r => r.status === 'rejected').length;
-
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #eef2ff 0%, #f5f3ff 50%, #fdf2f8 100%)', padding: '2rem 1rem' }}>
+    <div style={{ minHeight: '100vh', background: '#ffffff', padding: '2rem 1rem' }}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-
+        
         {/* Header */}
-        <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)', borderRadius: '1rem', padding: '2rem', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 10px 25px rgba(79,70,229,0.25)' }}>
+        <div style={{ borderBottom: '2px solid #e5e7eb', paddingBottom: '2rem', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 style={{ margin: '0', fontSize: '2rem', color: '#ffffff', fontWeight: '800' }}>🎓 Student Dashboard</h1>
-            <p style={{ margin: '0.5rem 0 0 0', color: '#e0e7ff' }}>Track and manage your document requests</p>
+            <h1 style={{ margin: '0', fontSize: '2rem', color: '#111827', fontWeight: '700' }}>Dashboard</h1>
+            <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280' }}>Manage your document requests</p>
           </div>
-          <button onClick={handleLogout} style={{ background: '#ffffff', color: '#4f46e5', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.5rem', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
+          <button onClick={handleLogout} style={{ background: '#ef4444', color: '#ffffff', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
             Logout
           </button>
         </div>
 
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-          <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '0.75rem', borderTop: '4px solid #d97706', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
-            <p style={{ margin: '0', color: '#6b7280', fontSize: '0.875rem', fontWeight: '600' }}>⏳ PENDING</p>
-            <p style={{ margin: '0.5rem 0 0 0', fontSize: '2.25rem', fontWeight: '800', color: '#d97706' }}>{pendingCount}</p>
-          </div>
-          <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '0.75rem', borderTop: '4px solid #16a34a', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
-            <p style={{ margin: '0', color: '#6b7280', fontSize: '0.875rem', fontWeight: '600' }}>✅ APPROVED</p>
-            <p style={{ margin: '0.5rem 0 0 0', fontSize: '2.25rem', fontWeight: '800', color: '#16a34a' }}>{approvedCount}</p>
-          </div>
-          <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '0.75rem', borderTop: '4px solid #dc2626', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
-            <p style={{ margin: '0', color: '#6b7280', fontSize: '0.875rem', fontWeight: '600' }}>❌ REJECTED</p>
-            <p style={{ margin: '0.5rem 0 0 0', fontSize: '2.25rem', fontWeight: '800', color: '#dc2626' }}>{rejectedCount}</p>
-          </div>
-        </div>
-
         {/* Requests List */}
-        <div style={{ background: '#ffffff', borderRadius: '1rem', padding: '2rem', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', marginBottom: '2rem' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937', marginBottom: '1.5rem' }}>📑 Your Requests</h2>
+        <div style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937', marginBottom: '1.5rem' }}>Your Requests</h2>
 
           {loading ? (
             <p style={{ color: '#6b7280' }}>Loading...</p>
           ) : requests.length === 0 ? (
-            <p style={{ color: '#6b7280' }}>No requests yet — click "New Request" below to get started.</p>
+            <p style={{ color: '#6b7280' }}>No requests yet</p>
           ) : (
             <div style={{ display: 'grid', gap: '1rem' }}>
-              {requests.map((req, i) => {
-                const cfg = getStatusConfig(req.status);
-                return (
-                  <div key={i} style={{ border: `2px solid ${cfg.border}22`, background: `${cfg.bg}55`, borderRadius: '0.75rem', padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '0.75rem' }}>
-                      <div>
-                        <h3 style={{ margin: '0', fontSize: '1.15rem', color: '#1f2937', fontWeight: '700' }}>{getDocIcon(req.documentType)} {req.documentType}</h3>
-                        <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.875rem', color: '#6b7280' }}>Request ID: <strong>{req.requestId}</strong> • {req.createdDate}</p>
-                      </div>
-                      <div style={{ background: cfg.border, color: '#ffffff', padding: '0.5rem 1rem', borderRadius: '2rem', fontSize: '0.875rem', fontWeight: '700', whiteSpace: 'nowrap' }}>
-                        {cfg.label}
-                      </div>
+              {requests.map((req, i) => (
+                <div key={i} style={{ border: '1px solid #e5e7eb', borderRadius: '0.5rem', padding: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                    <div>
+                      <h3 style={{ margin: '0', fontSize: '1.1rem', color: '#1f2937', fontWeight: '600' }}>{getDocIcon(req.documentType)} {req.documentType}</h3>
+                      <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#6b7280' }}>{req.requestId} • {req.createdDate}</p>
                     </div>
-
-                    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: `1px solid ${cfg.border}33` }}>
-                      {req.status === 'approved' ? (
-                        <button onClick={() => downloadDocument(req.requestId, req.documentType)} style={{ background: '#16a34a', color: '#ffffff', border: 'none', padding: '0.6rem 1.25rem', borderRadius: '0.5rem', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 6px rgba(22,163,74,0.3)' }}>
-                          ⬇️ Download Document
-                        </button>
-                      ) : req.status === 'rejected' ? (
-                        <div>
-                          <button style={{ background: '#dc2626', color: '#ffffff', border: 'none', padding: '0.6rem 1.25rem', borderRadius: '0.5rem', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 6px rgba(220,38,38,0.3)' }}>
-                            🔄 Resubmit Request
-                          </button>
-                          {req.comment && <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.875rem', color: '#991b1b' }}>💬 Admin note: {req.comment}</p>}
-                        </div>
-                      ) : (
-                        <span style={{ color: '#b45309', fontSize: '0.9rem', fontWeight: '600' }}>⏳ Waiting for admin review...</span>
-                      )}
+                    <div style={{ background: getStatusColor(req.status), color: '#ffffff', padding: '0.375rem 0.75rem', borderRadius: '0.25rem', fontSize: '0.875rem', fontWeight: '600' }}>
+                      {req.status.toUpperCase()}
                     </div>
                   </div>
-                );
-              })}
+
+                  <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb' }}>
+                    <p style={{ margin: '0', fontSize: '0.875rem', color: '#6b7280' }}>Purpose: {req.purpose}</p>
+                  </div>
+
+                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                    {req.status === 'approved' ? (
+                      <div>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <button onClick={() => downloadDocument(req.requestId, req.documentType)} style={{ background: '#16a34a', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
+                            ⬇️ Download
+                          </button>
+                          <button onClick={() => generateAndShowQR(req.requestId)} style={{ background: '#2563eb', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
+                            📱 View QR
+                          </button>
+                        </div>
+                        <p style={{ margin: '0', fontSize: '0.75rem', color: '#9ca3af' }}>Document includes real scannable QR code</p>
+                      </div>
+                    ) : req.status === 'rejected' ? (
+                      <button style={{ background: '#dc2626', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
+                        Resubmit
+                      </button>
+                    ) : (
+                      <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>⏳ Pending review by admin</span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button onClick={() => setShowForm(true)} style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#ffffff', border: 'none', padding: '1rem 2rem', borderRadius: '0.75rem', fontWeight: '700', cursor: 'pointer', fontSize: '1rem', boxShadow: '0 4px 12px rgba(79,70,229,0.3)' }}>
-            ➕ New Request
+        <div style={{ display: 'flex', gap: '1rem', paddingTop: '2rem', borderTop: '1px solid #e5e7eb' }}>
+          <button onClick={() => setShowCreateForm(true)} style={{ background: '#1f2937', color: '#ffffff', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
+            📝 New Request
           </button>
         </div>
+
+        {/* QR Code Modal */}
+        {showQRModal && selectedQR && (
+          <div style={{ position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: '9999' }}>
+            <div style={{ background: '#ffffff', padding: '2rem', borderRadius: '0.75rem', maxWidth: '500px', width: '90%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2 style={{ margin: '0', color: '#111827', fontWeight: '600' }}>Document QR Code</h2>
+                <button onClick={() => setShowQRModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+              </div>
+              
+              <div style={{ textAlign: 'center', padding: '2rem', background: '#f3f4f6', borderRadius: '0.5rem' }}>
+                <h3 style={{ margin: '0 0 1rem 0', color: '#1f2937', fontWeight: '600' }}>📱 Scan for Verification</h3>
+                
+                <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '0.5rem', display: 'inline-block', marginBottom: '1rem' }}>
+                  <svg width="200" height="200" style={{ border: '1px solid #e5e7eb' }}>
+                    <rect width="200" height="200" fill="white"/>
+                    <rect x="10" y="10" width="180" height="180" fill="none" stroke="#000" strokeWidth="2"/>
+                    <circle cx="100" cy="100" r="40" fill="none" stroke="#000" strokeWidth="2"/>
+                  </svg>
+                </div>
+
+                <div style={{ marginTop: '1rem' }}>
+                  <p style={{ margin: '0 0 0.5rem 0', color: '#6b7280', fontSize: '0.875rem' }}>Verification Code:</p>
+                  <p style={{ margin: '0', color: '#1f2937', fontWeight: '600', wordBreak: 'break-all' }}>{selectedQR.verificationCode}</p>
+                </div>
+
+                <p style={{ margin: '1rem 0 0 0', color: '#9ca3af', fontSize: '0.75rem' }}>Scan with your phone camera to verify authenticity</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

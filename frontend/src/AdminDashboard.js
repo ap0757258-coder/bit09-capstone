@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AdminUploadForm from './AdminUploadForm';
 
 export default function AdminDashboard() {
   const [requests, setRequests] = useState([]);
@@ -7,6 +8,7 @@ export default function AdminDashboard() {
   const [comment, setComment] = useState('');
   const [showAuditLogs, setShowAuditLogs] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [showUploadForm, setShowUploadForm] = useState(false);
 
   useEffect(() => {
     fetchRequests();
@@ -36,6 +38,16 @@ export default function AdminDashboard() {
   const handleViewAuditLogs = () => {
     fetchAuditLogs();
     setShowAuditLogs(true);
+  };
+
+  const downloadDocument = (requestId, documentType) => {
+    const url = `http://localhost:8080/api/download/document/${requestId}/${documentType}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${requestId}_${documentType}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleApprove = async (requestId) => {
@@ -106,6 +118,10 @@ export default function AdminDashboard() {
     window.location.href = '/';
   };
 
+  if (showUploadForm) {
+    return <AdminUploadForm onBack={() => { setShowUploadForm(false); fetchRequests(); }} />;
+  }
+
   const pendingRequests = requests.filter(r => r.status === 'pending');
   const approvedCount = requests.filter(r => r.status === 'approved').length;
   const rejectedCount = requests.filter(r => r.status === 'rejected').length;
@@ -121,6 +137,9 @@ export default function AdminDashboard() {
             <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280' }}>Manage document requests</p>
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
+            <button onClick={() => setShowUploadForm(true)} style={{ background: '#16a34a', color: '#ffffff', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
+              📤 Upload Document
+            </button>
             <button onClick={handleViewAuditLogs} style={{ background: '#1f2937', color: '#ffffff', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
               📋 Audit Logs
             </button>
@@ -259,6 +278,11 @@ export default function AdminDashboard() {
                       </div>
                       <p style={{ margin: '0', color: '#6b7280', fontSize: '0.875rem' }}>By: <strong>{log.adminName}</strong></p>
                       {log.comment && <p style={{ margin: '0.5rem 0 0 0', color: '#4b5563', fontSize: '0.875rem' }}>💬 {log.comment}</p>}
+                      {log.action === 'approved' && (
+                        <button onClick={() => downloadDocument(log.requestId, 'Document')} style={{ marginTop: '0.75rem', background: '#16a34a', color: '#ffffff', border: 'none', padding: '0.375rem 0.75rem', borderRadius: '0.25rem', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}>
+                          ⬇️ Download
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
