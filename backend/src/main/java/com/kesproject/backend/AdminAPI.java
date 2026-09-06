@@ -1,23 +1,32 @@
 package com.kesproject.backend;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/admin")
 @CrossOrigin("*")
 public class AdminAPI {
 
+    @Autowired
+    private DocumentRequestService documentRequestService;
+    
+    @Autowired
+    private AuditLogService auditLogService;
+
     @GetMapping("/requests")
-    public List<SharedRequestData.RequestItem> getRequests() {
-        return SharedRequestData.getAllRequests();
+    public List<DocumentRequest> getRequests() {
+        return documentRequestService.getAllRequests();
     }
 
     @PostMapping("/approve/{requestId}")
     public ApprovalResponse approveRequest(@PathVariable String requestId, @RequestBody ApprovalPayload payload) {
-        SharedRequestData.RequestItem req = SharedRequestData.getRequest(requestId);
-        if (req != null) {
-            SharedRequestData.updateRequest(requestId, "approved");
+        DocumentRequest approvedRequest = documentRequestService.approveRequest(requestId, payload.comment);
+        
+        if (approvedRequest != null) {
+            auditLogService.addLog(requestId, "admin", "approved", payload.comment);
             return new ApprovalResponse("success", "Request approved");
         }
         return new ApprovalResponse("error", "Request not found");
@@ -25,9 +34,10 @@ public class AdminAPI {
 
     @PostMapping("/reject/{requestId}")
     public ApprovalResponse rejectRequest(@PathVariable String requestId, @RequestBody ApprovalPayload payload) {
-        SharedRequestData.RequestItem req = SharedRequestData.getRequest(requestId);
-        if (req != null) {
-            SharedRequestData.updateRequest(requestId, "rejected");
+        DocumentRequest rejectedRequest = documentRequestService.rejectRequest(requestId, payload.comment);
+        
+        if (rejectedRequest != null) {
+            auditLogService.addLog(requestId, "admin", "rejected", payload.comment);
             return new ApprovalResponse("success", "Request rejected");
         }
         return new ApprovalResponse("error", "Request not found");

@@ -14,7 +14,7 @@ export default function Dashboard() {
 
   const fetchRequests = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/requests/test123');
+      const res = await fetch('http://localhost:8080/api/requests/TDIT065A');
       const data = await res.json();
       setRequests(data);
     } catch (e) {
@@ -30,6 +30,16 @@ export default function Dashboard() {
     if (doc.includes('Marksheet')) return '📊';
     if (doc.includes('Leaving')) return '🏫';
     return '📑';
+  };
+
+  const downloadCertificate = (requestId) => {
+    const url = `http://localhost:8080/api/certificate/download/${requestId}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${requestId}_Certificate.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const downloadDocument = (requestId, documentType) => {
@@ -54,7 +64,7 @@ export default function Dashboard() {
   };
 
   if (showCreateForm) {
-    return <CreateRequestForm studentId="test123" onBack={() => { setShowCreateForm(false); fetchRequests(); }} />;
+    return <CreateRequestForm studentId="TDIT065A" onBack={() => { setShowCreateForm(false); fetchRequests(); }} />;
   }
 
   const getStatusColor = (status) => {
@@ -107,15 +117,18 @@ export default function Dashboard() {
                   <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
                     {req.status === 'approved' ? (
                       <div>
-                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                          <button onClick={() => downloadDocument(req.requestId, req.documentType)} style={{ background: '#16a34a', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
-                            ⬇️ Download
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                          <button onClick={() => downloadCertificate(req.requestId)} style={{ background: '#2563eb', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer', fontSize: '0.875rem' }}>
+                            📜 Download Certificate
                           </button>
-                          <button onClick={() => generateAndShowQR(req.requestId)} style={{ background: '#2563eb', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
+                          <button onClick={() => downloadDocument(req.requestId, req.documentType)} style={{ background: '#16a34a', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer', fontSize: '0.875rem' }}>
+                            ⬇️ Download Document
+                          </button>
+                          <button onClick={() => generateAndShowQR(req.requestId)} style={{ background: '#f59e0b', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer', fontSize: '0.875rem' }}>
                             📱 View QR
                           </button>
                         </div>
-                        <p style={{ margin: '0', fontSize: '0.75rem', color: '#9ca3af' }}>Document includes real scannable QR code</p>
+                        <p style={{ margin: '0', fontSize: '0.75rem', color: '#9ca3af' }}>Certificate includes embedded QR code for verification</p>
                       </div>
                     ) : req.status === 'rejected' ? (
                       <button style={{ background: '#dc2626', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>

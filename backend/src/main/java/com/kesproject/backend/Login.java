@@ -1,20 +1,34 @@
 package com.kesproject.backend;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin("*")
 public class Login {
 
+    @Autowired
+    private StudentService studentService;
+
     @PostMapping("/login")
     public LoginResponse login(@RequestBody LoginRequest req) {
-        if ("test123".equals(req.u) && "test123".equals(req.p)) {
-            return new LoginResponse("success", "Login successful", "token-test123-abc", "student");
-        }
+        
+        // Check if admin
         if ("admin".equals(req.u) && "admin123".equals(req.p)) {
             return new LoginResponse("success", "Admin login successful", "token-admin-xyz", "admin");
         }
+        
+        // Check student in database
+        boolean isValid = studentService.validateStudent(req.u, req.p);
+        if (isValid) {
+            Optional<Student> student = studentService.getStudentByEnrollment(req.u);
+            if (student.isPresent()) {
+                return new LoginResponse("success", "Login successful", "token-" + req.u, "student");
+            }
+        }
+        
         return new LoginResponse("error", "Invalid credentials", "", "");
     }
 

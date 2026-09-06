@@ -1,26 +1,22 @@
 package com.kesproject.backend;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import java.util.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api")
 @CrossOrigin("*")
 public class RequestCreateAPI {
 
+    @Autowired
+    private DocumentRequestService documentRequestService;
+
     @GetMapping("/requests/{studentId}")
-    public List<SharedRequestData.RequestItem> getRequests(@PathVariable String studentId) {
-        List<SharedRequestData.RequestItem> allRequests = SharedRequestData.getAllRequests();
-        List<SharedRequestData.RequestItem> studentRequests = new ArrayList<>();
-        
-        for (SharedRequestData.RequestItem req : allRequests) {
-            if (req.studentId.equals(studentId)) {
-                studentRequests.add(req);
-            }
-        }
-        
+    public List<DocumentRequest> getRequests(@PathVariable String studentId) {
+        List<DocumentRequest> studentRequests = documentRequestService.getRequestsByStudentId(studentId);
         if (studentRequests.isEmpty()) {
-            return allRequests;
+            return documentRequestService.getAllRequests();
         }
         return studentRequests;
     }
@@ -37,22 +33,13 @@ public class RequestCreateAPI {
             return new CreateResponse("error", "Purpose required");
         }
 
-        List<SharedRequestData.RequestItem> allRequests = SharedRequestData.getAllRequests();
-        int newId = allRequests.size() + 1;
-        String requestId = "REQ-" + String.format("%03d", newId);
-        
-        SharedRequestData.RequestItem newRequest = new SharedRequestData.RequestItem(
-            newId,
-            requestId,
+        DocumentRequest newRequest = documentRequestService.createRequest(
             payload.studentId,
             payload.documentType,
-            "pending",
-            java.time.LocalDate.now().toString(),
             payload.purpose
         );
-        
-        SharedRequestData.addRequest(newRequest);
-        return new CreateResponse("success", "Request created successfully! Request ID: " + requestId);
+
+        return new CreateResponse("success", "Request created successfully! Request ID: " + newRequest.getRequestId());
     }
 
     public static class CreateRequestPayload {
