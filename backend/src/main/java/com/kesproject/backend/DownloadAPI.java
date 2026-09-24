@@ -1,93 +1,117 @@
 package com.kesproject.backend;
 
-import org.springframework.web.bind.annotation.*;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import java.nio.charset.StandardCharsets;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Optional;
+import java.io.File;
 
 @RestController
 @RequestMapping("/api/download")
 @CrossOrigin("*")
 public class DownloadAPI {
 
+    @Autowired
+    private DocumentRequestService documentRequestService;
+
     @GetMapping("/document/{requestId}/{documentType}")
     public ResponseEntity<byte[]> downloadDocument(
             @PathVariable String requestId,
             @PathVariable String documentType) {
         
-        String verificationCode = generateVerificationCode(requestId);
-        String content = generateDocumentContent(requestId, documentType, verificationCode);
-        byte[] fileContent = content.getBytes(StandardCharsets.UTF_8);
-        
-        String filename = requestId + "_" + documentType.replace(" ", "_") + ".txt";
-        
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.TEXT_PLAIN);
-        headers.setContentDispositionFormData("attachment", filename);
-        headers.setContentLength(fileContent.length);
-        
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(fileContent);
-    }
-
-    private String generateVerificationCode(String requestId) {
-        long timestamp = System.currentTimeMillis();
-        return requestId + "-" + String.format("%06d", timestamp % 1000000);
-    }
-
-    private String generateDocumentContent(String requestId, String documentType, String verificationCode) {
-        StringBuilder content = new StringBuilder();
-        
-        content.append("====================================\n");
-        content.append("KES SHROFF COLLEGE\n");
-        content.append("OFFICIAL DOCUMENT\n");
-        content.append("====================================\n\n");
-        
-        content.append("Request ID: ").append(requestId).append("\n");
-        content.append("Document Type: ").append(documentType).append("\n");
-        content.append("Issued Date: ").append(java.time.LocalDate.now()).append("\n");
-        content.append("Status: APPROVED\n");
-        content.append("Verification Code: ").append(verificationCode).append("\n");
-        content.append("Verify at: http://localhost:3000/verify/").append(verificationCode).append("\n\n");
-        
-        content.append("Student Information:\n");
-        content.append("Enrollment: AP0757258\n");
-        content.append("Name: Aaditi Kiritbhai Patel\n");
-        content.append("Department: IT\n");
-        content.append("Semester: V\n\n");
-        
-        if (documentType.contains("Bonafide")) {
-            content.append("BONAFIDE CERTIFICATE\n");
-            content.append("This is to certify that the student mentioned above\n");
-            content.append("is a bonafide student of this institution.\n");
-        } else if (documentType.contains("Transcript")) {
-            content.append("ACADEMIC TRANSCRIPT\n");
-            content.append("Academic Performance Record:\n");
-            content.append("Semester I: 8.5\n");
-            content.append("Semester II: 8.7\n");
-            content.append("Semester III: 8.9\n");
-            content.append("Semester IV: 9.1\n");
-        } else if (documentType.contains("Character")) {
-            content.append("CHARACTER CERTIFICATE\n");
-            content.append("This is to certify that the student is of good moral character.\n");
-        } else if (documentType.contains("Marksheet")) {
-            content.append("12TH STANDARD MARKSHEET\n");
-            content.append("Obtained Marks: 480/500\n");
-            content.append("Percentage: 96%\n");
-        } else if (documentType.contains("Leaving")) {
-            content.append("LEAVING CERTIFICATE\n");
-            content.append("This certifies that the student has left the institution.\n");
+        try {
+            System.out.println("📥 Download request: " + requestId);
+            
+            Optional<DocumentRequest> request = documentRequestService.getRequestById(requestId);
+            
+            if (request.isEmpty()) {
+                System.out.println("❌ Request not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            DocumentRequest doc = request.get();
+            
+            // Only approved documents can be downloaded
+            if (!doc.getStatus().equals("approved")) {
+                System.out.println("❌ Document not approved");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Get upload directory
+            String uploadDir = System.getProperty("java.io.tmpdir") + "bit09-uploads/";
+            System.out.println("📁 Looking in: " + uploadDir);
+            
+            File uploadFolder = new File(uploadDir);
+            
+            if (!uploadFolder.exists()) {
+                System.out.println("❌ Upload folder doesn't exist");
+                return ResponseEntity.notFound().build();
+            }
+            
+            // Find the uploaded file
+            File[] files = uploadFolder.listFiles();
+            File targetFile = null;
+            
+            if (files != null) {
+                System.out.println("📂 Files in folder: " + files.length);
+                
+                for (File file : files) {
+                    System.out.println("   - " + file.getName());
+                    
+                    if (file.getName().startsWith(requestId) && !file.isDirectory()) {
+                        targetFile = file;
+                        System.out.println("✅ Found file: " + file.getName());
+                        break;
+                    }
+                }
+            }
+            
+            if (targetFile == null) {
+                System.out.println("❌ No uploaded file found for: " + requestId);
+                return ResponseEntity.notFound().build();
+            }
+            
+            // Read file bytes
+            byte[] fileBytes = Files.readAllBytes(targetFile.toPath());
+            System.out.println("✅ File size: " + fileBytes.length + " bytes");
+            
+            // Determine content type
+            String fileName = targetFile.getName();
+            MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+            
+            if (fileName.endsWith(".pdf")) {
+                mediaType = MediaType.APPLICATION_PDF;
+            } else if (fileName.endsWith(".txt")) {
+                mediaType = MediaType.TEXT_PLAIN;
+            } else if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
+                mediaType = MediaType.IMAGE_JPEG;
+            } else if (fileName.endsWith(".png")) {
+                mediaType = MediaType.IMAGE_PNG;
+            } else if (fileName.endsWith(".doc") || fileName.endsWith(".docx")) {
+                mediaType = MediaType.APPLICATION_OCTET_STREAM;
+            }
+            
+            System.out.println("📄 Content-Type: " + mediaType);
+            
+            // Send file
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(mediaType);
+            headers.setContentDispositionFormData("attachment", fileName);
+            headers.setContentLength(fileBytes.length);
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(fileBytes);
+            
+        } catch (Exception e) {
+            System.out.println("❌ Download error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
         }
-        
-        content.append("\n====================================\n");
-        content.append("QR CODE: Scan to verify authenticity\n");
-        content.append("Verification Code: ").append(verificationCode).append("\n");
-        content.append("Digitally Signed by KES SHROFF COLLEGE\n");
-        content.append("This document is securely generated.\n");
-        content.append("====================================\n");
-        
-        return content.toString();
     }
 }

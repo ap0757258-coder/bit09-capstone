@@ -1,87 +1,63 @@
 package com.kesproject.backend;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/api/admin/upload")
 @CrossOrigin("*")
 public class DocumentUploadAPI {
 
-    private static List<Document> documents = new ArrayList<>();
+    @Autowired
+    private DocumentRequestService documentRequestService;
 
-    static {
-        documents.add(new Document(1, "REQ-001", "TDIT065A", "Bonafide Letter", "uploaded", "2026-09-05", "admin"));
-        documents.add(new Document(2, "REQ-002", "TDIT069A", "Transcript", "uploaded", "2026-09-04", "admin"));
-        documents.add(new Document(3, "REQ-003", "TDMMC0050", "Character Certificate", "pending", "2026-09-03", ""));
-    }
-
-    @GetMapping("/documents")
-    public List<Document> getDocuments() {
-        return documents;
-    }
-
-    @PostMapping("/upload")
-    public UploadResponse uploadDocument(@RequestBody DocumentPayload payload) {
-        if (payload.requestId == null || payload.requestId.isEmpty()) {
-            return new UploadResponse("error", "Request ID required");
-        }
-        if (payload.studentId == null || payload.studentId.isEmpty()) {
-            return new UploadResponse("error", "Student ID required");
-        }
-        if (payload.documentName == null || payload.documentName.isEmpty()) {
-            return new UploadResponse("error", "Document name required");
-        }
-
-        Document doc = new Document(
-            documents.size() + 1,
-            payload.requestId,
-            payload.studentId,
-            payload.documentName,
-            "uploaded",
-            java.time.LocalDate.now().toString(),
-            "admin"
-        );
-        documents.add(doc);
-        return new UploadResponse("success", "Document uploaded successfully");
-    }
-
-    @PostMapping("/sign/{documentId}")
-    public SignResponse signDocument(@PathVariable int documentId, @RequestBody SignPayload payload) {
-        for (Document doc : documents) {
-            if (doc.id == documentId) {
-                doc.status = "signed";
-                return new SignResponse("success", "Document signed", payload.adminComment);
+    @PostMapping("/{requestId}")
+    public UploadResponse uploadDocument(
+            @PathVariable String requestId,
+            @RequestParam("file") MultipartFile file) {
+        
+        try {
+            System.out.println("📤 Upload request for: " + requestId);
+            System.out.println("📄 File: " + file.getOriginalFilename());
+            
+            Optional<DocumentRequest> request = documentRequestService.getRequestById(requestId);
+            
+            if (request.isEmpty()) {
+                System.out.println("❌ Request not found: " + requestId);
+                return new UploadResponse("error", "Request not found");
             }
+            
+            DocumentRequest doc = request.get();
+            
+            // Use system temp directory
+            String uploadDir = System.getProperty("java.io.tmpdir") + "bit09-uploads/";
+            Path uploadPath = Paths.get(uploadDir);
+            
+            // Create directory if not exists
+            Files.createDirectories(uploadPath);
+            System.out.println("📁 Upload directory: " + uploadDir);
+            
+            // Save file
+            String fileName = requestId + "_" + file.getOriginalFilename();
+            Path filePath = uploadPath.resolve(fileName);
+            Files.write(filePath, file.getBytes());
+            
+            System.out.println("✅ Document uploaded successfully: " + fileName);
+            System.out.println("📍 Location: " + filePath.toString());
+            
+            return new UploadResponse("success", "Document uploaded successfully! File: " + fileName);
+            
+        } catch (Exception e) {
+            System.out.println("❌ Upload error: " + e.getMessage());
+            e.printStackTrace();
+            return new UploadResponse("error", "Upload failed: " + e.getMessage());
         }
-        return new SignResponse("error", "Document not found", "");
-    }
-
-    public static class Document {
-        public int id;
-        public String requestId;
-        public String studentId;
-        public String documentName;
-        public String status;
-        public String uploadedDate;
-        public String uploadedBy;
-
-        public Document(int id, String requestId, String studentId, String documentName, String status, String uploadedDate, String uploadedBy) {
-            this.id = id;
-            this.requestId = requestId;
-            this.studentId = studentId;
-            this.documentName = documentName;
-            this.status = status;
-            this.uploadedDate = uploadedDate;
-            this.uploadedBy = uploadedBy;
-        }
-    }
-
-    public static class DocumentPayload {
-        public String requestId;
-        public String studentId;
-        public String documentName;
-        public String documentFile;
     }
 
     public static class UploadResponse {
@@ -91,22 +67,6 @@ public class DocumentUploadAPI {
         public UploadResponse(String status, String message) {
             this.status = status;
             this.message = message;
-        }
-    }
-
-    public static class SignPayload {
-        public String adminComment;
-    }
-
-    public static class SignResponse {
-        public String status;
-        public String message;
-        public String comment;
-
-        public SignResponse(String status, String message, String comment) {
-            this.status = status;
-            this.message = message;
-            this.comment = comment;
         }
     }
 }

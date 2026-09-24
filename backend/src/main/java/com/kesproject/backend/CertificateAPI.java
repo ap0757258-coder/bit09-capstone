@@ -43,8 +43,8 @@ public class CertificateAPI {
             byte[] certificateBytes = certificateService.generateCertificatePDF(doc, verificationCode);
             
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.TEXT_PLAIN);
-            headers.setContentDispositionFormData("attachment", requestId + "_Certificate.txt");
+           headers.setContentType(MediaType.APPLICATION_PDF);
+headers.setContentDispositionFormData("attachment", requestId + "_Certificate.pdf");
             headers.setContentLength(certificateBytes.length);
             
             return ResponseEntity.ok()

@@ -15,21 +15,29 @@ public class Login {
     @PostMapping("/login")
     public LoginResponse login(@RequestBody LoginRequest req) {
         
-        // Check if admin
+        // Check if admin (hardcoded)
         if ("admin".equals(req.u) && "admin123".equals(req.p)) {
             return new LoginResponse("success", "Admin login successful", "token-admin-xyz", "admin");
         }
         
         // Check student in database
-        boolean isValid = studentService.validateStudent(req.u, req.p);
-        if (isValid) {
-            Optional<Student> student = studentService.getStudentByEnrollment(req.u);
-            if (student.isPresent()) {
-                return new LoginResponse("success", "Login successful", "token-" + req.u, "student");
-            }
+        Optional<Student> student = studentService.getStudentByEnrollment(req.u);
+        
+        if (student.isEmpty()) {
+            System.out.println("❌ Student not found: " + req.u);
+            return new LoginResponse("error", "Invalid enrollment number", "", "");
         }
         
-        return new LoginResponse("error", "Invalid credentials", "", "");
+        Student foundStudent = student.get();
+        
+        // Verify password
+        if (!foundStudent.getPassword().equals(req.p)) {
+            System.out.println("❌ Wrong password for: " + req.u);
+            return new LoginResponse("error", "Invalid password", "", "");
+        }
+        
+        System.out.println("✅ Student login successful: " + foundStudent.getName());
+        return new LoginResponse("success", "Login successful", "token-" + req.u, "student");
     }
 
     public static class LoginRequest {
