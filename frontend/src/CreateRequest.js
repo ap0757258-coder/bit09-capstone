@@ -12,14 +12,14 @@ export default function CreateRequest({ onBack }) {
     setMsg('');
 
     try {
-      const res = await fetch('http://localhost:8080/api/create-request', {
+      const res = await fetch('/api/create-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentType: docType, purpose: purpose })
       });
 
       const data = await res.json();
-      
+
       if (data.status === 'success') {
         setMsg('✅ Request created successfully');
         setTimeout(() => onBack(), 1200);
@@ -36,7 +36,7 @@ export default function CreateRequest({ onBack }) {
   return (
     <div style={{ minHeight: '100vh', background: '#ffffff', padding: '2rem 1rem' }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        
+
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#1f2937', fontSize: '1rem', cursor: 'pointer', marginBottom: '2rem', fontWeight: '600' }}>
           ← Back
         </button>
@@ -47,11 +47,11 @@ export default function CreateRequest({ onBack }) {
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          
+
           <div>
             <label style={{ display: 'block', fontWeight: '600', color: '#1f2937', marginBottom: '0.5rem' }}>Document Type</label>
-            <select 
-              value={docType} 
+            <select
+              value={docType}
               onChange={(e) => setDocType(e.target.value)}
               style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }}
               required
@@ -62,12 +62,19 @@ export default function CreateRequest({ onBack }) {
               <option value="Character Certificate">Character Certificate</option>
               <option value="12th Marksheet">12th Marksheet</option>
               <option value="Leaving Certificate">Leaving Certificate</option>
+              <option value="Migration Certificate">Migration Certificate</option>
+              <option value="Degree Certificate">Degree Certificate</option>
+              <option value="Provisional Certificate">Provisional Certificate</option>
+              <option value="No Objection Certificate">No Objection Certificate (NOC)</option>
+              <option value="Fee Receipt">Fee Receipt</option>
+              <option value="Gap Certificate">Gap Certificate</option>
+              <option value="Attendance Certificate">Attendance Certificate</option>
             </select>
           </div>
 
           <div>
             <label style={{ display: 'block', fontWeight: '600', color: '#1f2937', marginBottom: '0.5rem' }}>Purpose</label>
-            <textarea 
+            <textarea
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
               placeholder="Why do you need this document?"
@@ -82,7 +89,7 @@ export default function CreateRequest({ onBack }) {
             </div>
           )}
 
-          <button 
+          <button
             type="submit"
             disabled={loading}
             style={{ background: '#1f2937', color: '#ffffff', border: 'none', padding: '0.75rem', borderRadius: '0.375rem', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? '0.7' : '1' }}

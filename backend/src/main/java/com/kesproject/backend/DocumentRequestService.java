@@ -2,61 +2,65 @@ package com.kesproject.backend;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.Optional;
-import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 public class DocumentRequestService {
-    
+
     @Autowired
     private DocumentRequestRepository documentRequestRepository;
-    
-    public List<DocumentRequest> getAllRequests() {
-        return documentRequestRepository.findAll();
+
+    public DocumentRequest saveRequest(DocumentRequest request) {
+
+        // Generate request ID if it is missing
+        if (request.getRequestId() == null
+                || request.getRequestId().trim().isEmpty()) {
+            request.setRequestId(
+                "REQ-" + UUID.randomUUID().toString()
+            );
+        }
+
+        return documentRequestRepository.save(request);
     }
-    
-    public List<DocumentRequest> getRequestsByStudentId(String studentId) {
-        return documentRequestRepository.findByStudentId(studentId);
-    }
-    
-    public List<DocumentRequest> getRequestsByStatus(String status) {
-        return documentRequestRepository.findByStatus(status);
-    }
-    
+
     public Optional<DocumentRequest> getRequestById(String requestId) {
         return documentRequestRepository.findByRequestId(requestId);
     }
-    
-    public DocumentRequest createRequest(String studentId, String documentType, String purpose) {
-        // Generate request ID
-        List<DocumentRequest> allRequests = documentRequestRepository.findAll();
-        String requestId = "REQ-" + String.format("%03d", allRequests.size() + 1);
-        
-        DocumentRequest request = new DocumentRequest(requestId, studentId, documentType, "pending", purpose);
-        return documentRequestRepository.save(request);
+
+    public List<DocumentRequest> getRequestsByStudentId(String studentId) {
+        return documentRequestRepository.findByStudentId(studentId);
     }
-    
-    public DocumentRequest approveRequest(String requestId, String adminComment) {
-        Optional<DocumentRequest> request = documentRequestRepository.findByRequestId(requestId);
-        if (request.isPresent()) {
-            DocumentRequest doc = request.get();
-            doc.setStatus("approved");
-            doc.setAdminComment(adminComment);
-            doc.setApprovedDate(LocalDateTime.now());
-            return documentRequestRepository.save(doc);
-        }
-        return null;
+
+    public List<DocumentRequest> getAllRequests() {
+        return documentRequestRepository.findAll();
     }
-    
-    public DocumentRequest rejectRequest(String requestId, String adminComment) {
-        Optional<DocumentRequest> request = documentRequestRepository.findByRequestId(requestId);
-        if (request.isPresent()) {
-            DocumentRequest doc = request.get();
-            doc.setStatus("rejected");
-            doc.setAdminComment(adminComment);
-            return documentRequestRepository.save(doc);
+
+    public void updateRequest(DocumentRequest request) {
+        documentRequestRepository.save(request);
+    }
+
+    public void approveRequest(String requestId) {
+        Optional<DocumentRequest> req =
+                documentRequestRepository.findByRequestId(requestId);
+
+        if (req.isPresent()) {
+            DocumentRequest request = req.get();
+            request.setStatus("approved");
+            documentRequestRepository.save(request);
         }
-        return null;
+    }
+
+    public void rejectRequest(String requestId) {
+        Optional<DocumentRequest> req =
+                documentRequestRepository.findByRequestId(requestId);
+
+        if (req.isPresent()) {
+            DocumentRequest request = req.get();
+            request.setStatus("rejected");
+            documentRequestRepository.save(request);
+        }
     }
 }

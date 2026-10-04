@@ -1,3 +1,4 @@
+
 package com.kesproject.backend;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -5,11 +6,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
-import java.io.File;
 
 @RestController
 @RequestMapping("/api/download")
@@ -23,95 +24,78 @@ public class DownloadAPI {
     public ResponseEntity<byte[]> downloadDocument(
             @PathVariable String requestId,
             @PathVariable String documentType) {
-        
+
         try {
-            System.out.println("📥 Download request: " + requestId);
-            
-            Optional<DocumentRequest> request = documentRequestService.getRequestById(requestId);
-            
-            if (request.isEmpty()) {
-                System.out.println("❌ Request not found");
+            System.out.println("Download request: " + requestId);
+
+            Optional<DocumentRequest> optionalRequest =
+                    documentRequestService.getRequestById(requestId);
+
+            if (optionalRequest.isEmpty()) {
+                System.out.println("Request not found: " + requestId);
                 return ResponseEntity.notFound().build();
             }
-            
-            DocumentRequest doc = request.get();
-            
-            // Only approved documents can be downloaded
-            if (!doc.getStatus().equals("approved")) {
-                System.out.println("❌ Document not approved");
+
+            DocumentRequest doc = optionalRequest.get();
+
+            String status = doc.getStatus() == null
+                    ? ""
+                    : doc.getStatus().trim();
+
+            // Allow downloading after admin approval/upload.
+            if (!status.equalsIgnoreCase("approved")
+                    && !status.equalsIgnoreCase("uploaded")) {
+
+                System.out.println("Document is not approved/uploaded. Status: " + status);
                 return ResponseEntity.badRequest().build();
             }
-            
-            // Get upload directory
-            String uploadDir = System.getProperty("java.io.tmpdir") + "bit09-uploads/";
-            System.out.println("📁 Looking in: " + uploadDir);
-            
-            File uploadFolder = new File(uploadDir);
-            
-            if (!uploadFolder.exists()) {
-                System.out.println("❌ Upload folder doesn't exist");
+
+            // Read the exact filename saved in the database.
+            String fileName = doc.getFileName();
+
+            if (fileName == null || fileName.trim().isEmpty()) {
+                System.out.println("No filename saved for request: " + requestId);
                 return ResponseEntity.notFound().build();
             }
-            
-            // Find the uploaded file
-            File[] files = uploadFolder.listFiles();
-            File targetFile = null;
-            
-            if (files != null) {
-                System.out.println("📂 Files in folder: " + files.length);
-                
-                for (File file : files) {
-                    System.out.println("   - " + file.getName());
-                    
-                    if (file.getName().startsWith(requestId) && !file.isDirectory()) {
-                        targetFile = file;
-                        System.out.println("✅ Found file: " + file.getName());
-                        break;
-                    }
-                }
-            }
-            
-            if (targetFile == null) {
-                System.out.println("❌ No uploaded file found for: " + requestId);
+
+            Path uploadPath = Paths.get(
+                    System.getProperty("java.io.tmpdir"),
+                    "bit09-uploads"
+            ).toAbsolutePath().normalize();
+
+            // Prevent a filename from pointing outside the upload directory.
+            Path filePath = uploadPath.resolve(fileName).normalize();
+
+            if (!filePath.startsWith(uploadPath)
+                    || !Files.isRegularFile(filePath)) {
+
+                System.out.println("Uploaded file not found: " + filePath);
                 return ResponseEntity.notFound().build();
             }
-            
-            // Read file bytes
-            byte[] fileBytes = Files.readAllBytes(targetFile.toPath());
-            System.out.println("✅ File size: " + fileBytes.length + " bytes");
-            
-            // Determine content type
-            String fileName = targetFile.getName();
-            MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
-            
-            if (fileName.endsWith(".pdf")) {
-                mediaType = MediaType.APPLICATION_PDF;
-            } else if (fileName.endsWith(".txt")) {
-                mediaType = MediaType.TEXT_PLAIN;
-            } else if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
-                mediaType = MediaType.IMAGE_JPEG;
-            } else if (fileName.endsWith(".png")) {
-                mediaType = MediaType.IMAGE_PNG;
-            } else if (fileName.endsWith(".doc") || fileName.endsWith(".docx")) {
-                mediaType = MediaType.APPLICATION_OCTET_STREAM;
-            }
-            
-            System.out.println("📄 Content-Type: " + mediaType);
-            
-            // Send file
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(mediaType);
-            headers.setContentDispositionFormData("attachment", fileName);
-            headers.setContentLength(fileBytes.length);
-            
+
+            byte[] fileBytes = Files.readAllBytes(filePath);
+
+            String downloadName = filePath.getFileName().toString();
+
+            MediaType mediaType = downloadName.toLowerCase().endsWith(".pdf")
+                    ? MediaType.APPLICATION_PDF
+                    : MediaType.APPLICATION_OCTET_STREAM;
+
             return ResponseEntity.ok()
-                    .headers(headers)
+                    .contentType(mediaType)
+                    .header(
+                            HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + downloadName.replace("\"", "") + "\""
+                    )
+                    .contentLength(fileBytes.length)
                     .body(fileBytes);
-            
+
         } catch (Exception e) {
-            System.out.println("❌ Download error: " + e.getMessage());
+            System.err.println("Download error: " + e.getMessage());
             e.printStackTrace();
+
             return ResponseEntity.internalServerError().build();
         }
     }
 }
+

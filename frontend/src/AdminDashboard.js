@@ -3,12 +3,9 @@ import React, { useState, useEffect } from 'react';
 export default function AdminDashboard() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAuditModal, setShowAuditModal] = useState(false);
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [selectedFiles, setSelectedFiles] = useState({});
-  const [uploadStatus, setUploadStatus] = useState({});
+  const [error, setError] = useState('');
 
-  const NGROK_URL = 'https://murky-rimmed-legend.ngrok-free.dev';
+  const NGROK_URL = '';
 
   useEffect(() => {
     fetchRequests();
@@ -16,38 +13,26 @@ export default function AdminDashboard() {
 
   const fetchRequests = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/admin/requests');
+      const res = await fetch('/api/admin/requests');
       const data = await res.json();
       setRequests(data);
     } catch (e) {
-      console.log('Error:', e);
+      setError('Error loading requests: ' + e.message);
     }
     setLoading(false);
   };
 
-  const fetchAuditLogs = async () => {
-    try {
-      const res = await fetch('http://localhost:8080/api/audit/logs');
-      const data = await res.json();
-      setAuditLogs(data);
-      setShowAuditModal(true);
-    } catch (e) {
-      console.log('Error:', e);
-    }
-  };
-
   const approveRequest = async (requestId) => {
-    const comment = prompt('Approval comment (optional):');
     try {
-      const res = await fetch(`http://localhost:8080/api/admin/approve/${requestId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: comment || '' })
+      const res = await fetch(`/api/admin/approve/${requestId}`, {
+        method: 'POST'
       });
       const data = await res.json();
       if (data.status === 'success') {
         alert('✅ Request approved!');
         fetchRequests();
+      } else {
+        alert('❌ Approval failed: ' + data.message);
       }
     } catch (e) {
       alert('Error: ' + e.message);
@@ -55,237 +40,241 @@ export default function AdminDashboard() {
   };
 
   const rejectRequest = async (requestId) => {
-    const comment = prompt('Rejection reason:');
-    if (!comment) return;
-    
     try {
-      const res = await fetch(`http://localhost:8080/api/admin/reject/${requestId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: comment })
+      const res = await fetch(`/api/admin/reject/${requestId}`, {
+        method: 'POST'
       });
       const data = await res.json();
       if (data.status === 'success') {
         alert('❌ Request rejected!');
         fetchRequests();
+      } else {
+        alert('Error: ' + data.message);
       }
     } catch (e) {
       alert('Error: ' + e.message);
     }
   };
 
-  const handleFileSelect = (requestId, file) => {
-    setSelectedFiles({
-      ...selectedFiles,
-      [requestId]: file
-    });
-  };
-
-  const uploadDocument = async (requestId) => {
-    const file = selectedFiles[requestId];
+  const handleUpload = async (requestId) => {
+    const fileInput = document.getElementById('file_' + requestId);
+    const file = fileInput.files[0];
     
     if (!file) {
-      alert('Please select a file first!');
+      alert('Please select a file');
       return;
     }
-
-    setUploadStatus({ ...uploadStatus, [requestId]: 'uploading' });
-
+    
+    const allowed = /\.(pdf|jpe?g|png|gif|bmp|txt)$/i;
+    if (!allowed.test(file.name)) {
+      alert('Allowed files: PDF, JPG, PNG, GIF, BMP, TXT. For Word or Excel files, use "Save as PDF" first.');
+      return;
+    }
+    
     const formData = new FormData();
     formData.append('file', file);
-
+    
     try {
-      const res = await fetch(`${NGROK_URL}/api/admin/upload/${requestId}`, {
+      const res = await fetch(`/api/admin/upload/${requestId}`, {
         method: 'POST',
-        headers: {
-          'ngrok-skip-browser-warning': 'true'
-        },
         body: formData
       });
+      
       const data = await res.json();
       
       if (data.status === 'success') {
-        alert('✅ Document uploaded successfully!');
-        setUploadStatus({ ...uploadStatus, [requestId]: 'done' });
-        setSelectedFiles({ ...selectedFiles, [requestId]: null });
+        alert('✅ ' + data.message);
+        fileInput.value = '';
         fetchRequests();
       } else {
-        alert('❌ Upload failed: ' + data.message);
-        setUploadStatus({ ...uploadStatus, [requestId]: 'error' });
+        alert('❌ ' + data.message);
       }
     } catch (e) {
-      alert('Error uploading: ' + e.message);
-      setUploadStatus({ ...uploadStatus, [requestId]: 'error' });
+      alert('Upload failed: ' + e.message);
     }
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('studentId');
+    localStorage.removeItem('role');
+    localStorage.removeItem('userType');
     window.location.href = '/';
   };
 
+  const getDocIcon = (doc) => {
+    const iconMap = {
+      'Bonafide Letter': '📄',
+      'Academic Transcript': '📋',
+      'Marksheet': '📊',
+      'Character Certificate': '🎓',
+      'Leaving Certificate': '🏫',
+      'Completion Certificate': '✅',
+      'Internship Certificate': '💼',
+      'NOC (No Objection Certificate)': '📝'
+    };
+    return iconMap[doc] || '📑';
+  };
+
   const getStatusColor = (status) => {
-    if (status === 'approved') return '#16a34a';
-    if (status === 'rejected') return '#dc2626';
-    return '#ca8a04';
+    if (status === 'approved') return { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' };
+    if (status === 'rejected') return { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' };
+    return { bg: '#fef3c7', text: '#92400e', border: '#fcd34d' };
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#ffffff', padding: '2rem 1rem' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', padding: '2rem 1rem' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         
         {/* Header */}
-        <div style={{ borderBottom: '2px solid #e5e7eb', paddingBottom: '2rem', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 style={{ margin: '0', fontSize: '2rem', color: '#111827', fontWeight: '700' }}>Admin Dashboard</h1>
-            <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280' }}>Manage student document requests</p>
-          </div>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button onClick={fetchAuditLogs} style={{ background: '#667eea', color: '#ffffff', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
-              📋 Audit Logs
-            </button>
-            <button onClick={handleLogout} style={{ background: '#ef4444', color: '#ffffff', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer' }}>
-              Logout
+        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '1rem', padding: '2rem', marginBottom: '2rem', boxShadow: '0 10px 30px rgba(102, 126, 234, 0.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h1 style={{ margin: '0', fontSize: '2.5rem', color: '#ffffff', fontWeight: '700' }}>👨‍💼 Admin Dashboard</h1>
+              <p style={{ margin: '0.5rem 0 0 0', color: '#e0e7ff', fontSize: '1rem' }}>Manage all document requests</p>
+            </div>
+            <button onClick={handleLogout} style={{ background: '#ffffff', color: '#667eea', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer', fontSize: '0.95rem', transition: 'all 0.2s' }}
+              onMouseEnter={(e) => (e.target.style.transform = 'translateY(-2px)')}
+              onMouseLeave={(e) => (e.target.style.transform = 'translateY(0)')}
+            >
+              🚪 Logout
             </button>
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '0.5rem', padding: '1rem', marginBottom: '1.5rem', color: '#991b1b', fontWeight: '500' }}>
+            ⚠️ {error}
+          </div>
+        )}
+
         {/* Requests List */}
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937', marginBottom: '1.5rem' }}>Pending & Approved Requests</h2>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>📋 All Requests ({requests.length})</h2>
 
           {loading ? (
-            <p style={{ color: '#6b7280' }}>Loading...</p>
+            <div style={{ textAlign: 'center', padding: '3rem', background: '#ffffff', borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }}>
+              <p style={{ color: '#6b7280', fontSize: '1.1rem' }}>🔄 Loading requests...</p>
+            </div>
           ) : requests.length === 0 ? (
-            <p style={{ color: '#6b7280' }}>No requests</p>
+            <div style={{ textAlign: 'center', padding: '3rem', background: '#ffffff', borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }}>
+              <p style={{ color: '#6b7280', fontSize: '1.1rem' }}>📭 No requests yet</p>
+            </div>
           ) : (
-            <div style={{ display: 'grid', gap: '1rem' }}>
+            <div style={{ display: 'grid', gap: '1.5rem' }}>
               {requests.map((req, i) => (
-                <div key={i} style={{ border: '1px solid #e5e7eb', borderRadius: '0.5rem', padding: '1.5rem' }}>
+                <div key={i} style={{ background: '#ffffff', borderRadius: '1rem', padding: '1.75rem', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)', border: `2px solid ${getStatusColor(req.status).border}`, transition: 'all 0.3s' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-4px)', e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.12)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)', e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)')}
+                >
+                  {/* Top Section - Document & Status */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
                     <div>
-                      <h3 style={{ margin: '0', fontSize: '1.1rem', color: '#1f2937', fontWeight: '600' }}>📄 {req.documentType}</h3>
-                      <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#6b7280' }}>Request: {req.requestId} • {req.createdDate}</p>
+                      <h3 style={{ margin: '0', fontSize: '1.25rem', color: '#1f2937', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {getDocIcon(req.documentType)} {req.documentType}
+                      </h3>
+                      <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#6b7280' }}>🔖 {req.requestId} • 📅 {req.createdDate}</p>
                     </div>
-                    <div style={{ background: getStatusColor(req.status), color: '#ffffff', padding: '0.375rem 0.75rem', borderRadius: '0.25rem', fontSize: '0.875rem', fontWeight: '600' }}>
-                      {req.status.toUpperCase()}
-                    </div>
-                  </div>
-
-                  {/* Student Details */}
-                  <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '0.375rem', marginBottom: '1rem', border: '1px solid #e5e7eb' }}>
-                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>Student Information</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.875rem' }}>
-                      <div>
-                        <p style={{ margin: '0', color: '#6b7280' }}>Name:</p>
-                        <p style={{ margin: '0.25rem 0 0 0', color: '#111827', fontWeight: '600' }}>{req.studentName}</p>
-                      </div>
-                      <div>
-                        <p style={{ margin: '0', color: '#6b7280' }}>Enrollment:</p>
-                        <p style={{ margin: '0.25rem 0 0 0', color: '#111827', fontWeight: '600' }}>{req.studentId}</p>
-                      </div>
-                      <div>
-                        <p style={{ margin: '0', color: '#6b7280' }}>Department:</p>
-                        <p style={{ margin: '0.25rem 0 0 0', color: '#111827', fontWeight: '600' }}>{req.studentDept}</p>
-                      </div>
-                      <div>
-                        <p style={{ margin: '0', color: '#6b7280' }}>Purpose:</p>
-                        <p style={{ margin: '0.25rem 0 0 0', color: '#111827', fontWeight: '600' }}>{req.purpose}</p>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <div style={{ background: getStatusColor(req.status).bg, color: getStatusColor(req.status).text, padding: '0.5rem 1rem', borderRadius: '0.375rem', fontSize: '0.875rem', fontWeight: '700' }}>
+                        {req.status === 'approved' && '✅ APPROVED'}
+                        {req.status === 'rejected' && '❌ REJECTED'}
+                        {req.status === 'pending' && '⏳ PENDING'}
                       </div>
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                    {req.status === 'pending' && (
-                      <>
-                        <button onClick={() => approveRequest(req.requestId)} style={{ background: '#16a34a', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer', fontSize: '0.875rem' }}>
+                  {/* Student Info */}
+                  <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '0.75rem', marginBottom: '1rem', borderLeft: `4px solid ${getStatusColor(req.status).border}` }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div>
+                        <p style={{ margin: '0', fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>👤 Student Name</p>
+                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '1rem', fontWeight: '700', color: '#1f2937' }}>{req.studentName}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0', fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>🎓 Enrollment</p>
+                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '1rem', fontWeight: '700', color: '#1f2937', fontFamily: 'monospace' }}>{req.studentId}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0', fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>📚 Department</p>
+                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '1rem', fontWeight: '700', color: '#1f2937' }}>{req.studentDepartment}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0', fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>📧 Email</p>
+                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '1rem', fontWeight: '700', color: '#1f2937' }}>{req.studentEmail}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Purpose Section */}
+                  <div style={{ background: '#fef3c7', padding: '1rem', borderRadius: '0.75rem', marginBottom: '1rem', borderLeft: '4px solid #fcd34d' }}>
+                    <p style={{ margin: '0', fontSize: '0.875rem', color: '#92400e', fontWeight: '600' }}>📌 Purpose of Request</p>
+                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.95rem', color: '#111827' }}>{req.purpose}</p>
+                  </div>
+
+                  {/* Alumni Badge */}
+                  {req.studentStatus === 'alumni' && (
+                    <div style={{ background: '#fce7f3', padding: '0.75rem 1rem', borderRadius: '0.375rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid #fbcfe8' }}>
+                      <span style={{ fontSize: '1.25rem' }}>🎓</span>
+                      <span style={{ color: '#831843', fontWeight: '700', fontSize: '0.875rem' }}>ALUMNI REQUEST - Past Student</span>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {req.status === 'pending' ? (
+                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <button onClick={() => approveRequest(req.requestId)} style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#ffffff', border: 'none', padding: '0.625rem 1.25rem', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer', fontSize: '0.875rem', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}
+                          onMouseEnter={(e) => (e.target.style.transform = 'translateY(-2px)', e.target.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)')}
+                          onMouseLeave={(e) => (e.target.style.transform = 'translateY(0)', e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)')}
+                        >
                           ✅ Approve
                         </button>
-                        <button onClick={() => rejectRequest(req.requestId)} style={{ background: '#dc2626', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', cursor: 'pointer', fontSize: '0.875rem' }}>
+                        <button onClick={() => rejectRequest(req.requestId)} style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#ffffff', border: 'none', padding: '0.625rem 1.25rem', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer', fontSize: '0.875rem', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)' }}
+                          onMouseEnter={(e) => (e.target.style.transform = 'translateY(-2px)', e.target.style.boxShadow = '0 6px 16px rgba(239, 68, 68, 0.4)')}
+                          onMouseLeave={(e) => (e.target.style.transform = 'translateY(0)', e.target.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)')}
+                        >
                           ❌ Reject
                         </button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Upload Section - Only for Approved Requests */}
-                  {req.status === 'approved' && (
-                    <div style={{ marginTop: '1rem', padding: '1rem', background: '#f0fdf4', borderRadius: '0.375rem', border: '2px solid #16a34a' }}>
-                      <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: '600', color: '#166534' }}>📁 Upload Document (After Approval)</p>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <input
-                          type="file"
-                          id={`file-${req.requestId}`}
-                          onChange={(e) => handleFileSelect(req.requestId, e.target.files[0])}
-                          style={{ flex: 1, fontSize: '0.75rem', padding: '0.5rem' }}
-                        />
-                        <button
-                          onClick={() => uploadDocument(req.requestId)}
-                          disabled={uploadStatus[req.requestId] === 'uploading'}
-                          style={{ 
-                            background: uploadStatus[req.requestId] === 'done' ? '#16a34a' : '#2563eb', 
-                            color: '#ffffff', 
-                            border: 'none', 
-                            padding: '0.5rem 1rem', 
-                            borderRadius: '0.375rem', 
-                            fontWeight: '600', 
-                            cursor: uploadStatus[req.requestId] === 'uploading' ? 'not-allowed' : 'pointer', 
-                            fontSize: '0.875rem',
-                            whiteSpace: 'nowrap',
-                            opacity: uploadStatus[req.requestId] === 'uploading' ? 0.6 : 1
-                          }}
-                        >
-                          {uploadStatus[req.requestId] === 'uploading' ? '⏳ Uploading...' : uploadStatus[req.requestId] === 'done' ? '✅ Uploaded' : '📤 Upload'}
+                      </div>
+                    ) : req.status === 'approved' ? (
+                      <div>
+                        <div style={{ background: '#d1fae5', border: '2px solid #6ee7b7', padding: '1rem', borderRadius: '0.75rem', marginBottom: '1rem' }}>
+                          <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.875rem', fontWeight: '600', color: '#065f46' }}>📤 Upload Document (PDF, JPG, PNG, TXT)</p>
+                          <p style={{ margin: '0 0 1rem 0', fontSize: '0.75rem', color: '#047857' }}>Student will download it as a PDF</p>
+                          
+                          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                            <input
+                              type="file"
+                              id={'file_' + req.requestId}
+                              accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.txt"
+                              style={{ padding: '0.5rem', border: '1px solid #6ee7b7', borderRadius: '0.5rem', fontSize: '0.875rem', flex: 1, boxSizing: 'border-box' }}
+                            />
+                            <button
+                              onClick={() => handleUpload(req.requestId)}
+                              style={{ background: '#10b981', color: '#ffffff', border: 'none', padding: '0.625rem 1.25rem', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer', fontSize: '0.875rem', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}
+                              onMouseEnter={(e) => (e.target.style.transform = 'translateY(-2px)', e.target.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)')}
+                              onMouseLeave={(e) => (e.target.style.transform = 'translateY(0)', e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)')}
+                            >
+                              📤 Upload
+                            </button>
+                          </div>
+                        </div>
+                        <button style={{ background: '#d1f5e0', color: '#065f46', border: '1px solid #6ee7b7', padding: '0.625rem 1.25rem', borderRadius: '0.5rem', fontWeight: '600', cursor: 'default', fontSize: '0.875rem', width: '100%' }}>
+                          ✅ Approved - Awaiting Upload
                         </button>
                       </div>
-                      <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.7rem', color: '#166534' }}>💡 Upload only after approving - Student can download once uploaded!</p>
-                    </div>
-                  )}
-
-                  {req.status === 'rejected' && (
-                    <div style={{ marginTop: '1rem', padding: '1rem', background: '#fef2f2', borderRadius: '0.375rem', border: '1px solid #dc2626' }}>
-                      <p style={{ margin: '0', fontSize: '0.875rem', color: '#991b1b' }}>❌ Request rejected</p>
-                    </div>
-                  )}
+                    ) : (
+                      <button style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', padding: '0.625rem 1.25rem', borderRadius: '0.5rem', fontWeight: '600', cursor: 'default', fontSize: '0.875rem', width: '100%' }}>
+                        ❌ Rejected
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
-
-        {/* Audit Logs Modal */}
-        {showAuditModal && (
-          <div style={{ position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: '9999' }}>
-            <div style={{ background: '#ffffff', padding: '2rem', borderRadius: '0.75rem', maxWidth: '600px', width: '90%', maxHeight: '80vh', overflowY: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h2 style={{ margin: '0', color: '#111827', fontWeight: '600' }}>📋 Audit Logs</h2>
-                <button onClick={() => setShowAuditModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
-              </div>
-
-              {auditLogs.length === 0 ? (
-                <p style={{ color: '#6b7280' }}>No audit logs yet</p>
-              ) : (
-                <div style={{ display: 'grid', gap: '1rem' }}>
-                  {auditLogs.map((log, i) => (
-                    <div key={i} style={{ padding: '1rem', background: '#f9fafb', borderRadius: '0.375rem', border: '1px solid #e5e7eb' }}>
-                      <p style={{ margin: '0', fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>
-                        {log.action.toUpperCase()} - {log.requestId}
-                      </p>
-                      <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#6b7280' }}>
-                        By: {log.adminName} • {log.timestamp}
-                      </p>
-                      {log.comment && (
-                        <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#4b5563', fontStyle: 'italic' }}>
-                          💬 {log.comment}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

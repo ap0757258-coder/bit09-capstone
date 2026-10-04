@@ -8,6 +8,7 @@ import java.util.Optional;
 @Repository
 public interface DocumentRequestRepository extends JpaRepository<DocumentRequest, Long> {
     Optional<DocumentRequest> findByRequestId(String requestId);
+    Optional<DocumentRequest> findByVerificationCode(String verificationCode);
     List<DocumentRequest> findByStudentId(String studentId);
     List<DocumentRequest> findByStatus(String status);
 }

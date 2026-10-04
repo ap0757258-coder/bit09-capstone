@@ -7,5 +7,4 @@ import java.util.List;
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     List<AuditLog> findByRequestId(String requestId);
-    List<AuditLog> findByAdminName(String adminName);
 }

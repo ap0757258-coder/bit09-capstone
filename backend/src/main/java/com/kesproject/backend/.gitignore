@@ -1,5 +1,5 @@
 target/
-/config/
+config/
 .idea/
 .vscode/
 *.log
@@ -8,3 +8,4 @@ HELP.md
 backend-log.txt
 error.txt
 run-log.txt
+uploads/

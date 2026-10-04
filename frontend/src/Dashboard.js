@@ -9,8 +9,16 @@ export default function Dashboard() {
   const [selectedQR, setSelectedQR] = useState(null);
 
   const NGROK_URL = 'https://murky-rimmed-legend.ngrok-free.dev';
+  const API_URL = '';
+
+  // Login ke baad jo ID save hui hai wahi use hogi
+  const studentId = localStorage.getItem('studentId');
 
   useEffect(() => {
+    if (!studentId) {
+      setLoading(false);
+      return;
+    }
     fetchRequests();
   }, []);
 
@@ -23,11 +31,11 @@ export default function Dashboard() {
   const fetchRequests = async () => {
     try {
       const res = await fetch(
-        'http://localhost:8080/api/requests/TDIT065A'
+        `${API_URL}/api/documents/student/${studentId}`
       );
 
       const data = await res.json();
-      setRequests(data);
+      setRequests(Array.isArray(data) ? data : []);
     } catch (e) {
       console.log('Error:', e);
     }
@@ -41,12 +49,20 @@ export default function Dashboard() {
     if (doc.includes('Character')) return '🎓';
     if (doc.includes('Marksheet')) return '📊';
     if (doc.includes('Leaving')) return '🏫';
+    if (doc.includes('Migration')) return '✈️';
+    if (doc.includes('Degree')) return '🎖️';
+    if (doc.includes('Provisional')) return '📝';
+    if (doc.includes('Objection')) return '✔️';
+    if (doc.includes('Fee')) return '💰';
+    if (doc.includes('Gap')) return '⏳';
+    if (doc.includes('Attendance')) return '📅';
 
     return '📑';
   };
 
   // =========================================================
   // QR CODE GENERATION
+  // (QR phone se scan hota hai, isliye ye ngrok URL par hi rahega)
   // =========================================================
 
   const generateQRCode = async () => {
@@ -56,9 +72,6 @@ export default function Dashboard() {
       if (container && selectedQR) {
         container.innerHTML = '';
 
-        // IMPORTANT:
-        // QR opens the React verification page.
-        // NOT /api/verify
         const verificationUrl =
           `${NGROK_URL}/verify/${selectedQR.verificationCode}`;
 
@@ -93,12 +106,12 @@ export default function Dashboard() {
   };
 
   // =========================================================
-  // DOWNLOAD CERTIFICATE
+  // DOWNLOAD CERTIFICATE (localhost se, ngrok nahi chahiye)
   // =========================================================
 
   const downloadCertificate = (requestId) => {
     const url =
-      `${NGROK_URL}/api/certificate/download/${requestId}`;
+      `${API_URL}/api/certificate/download/${requestId}`;
 
     const link = document.createElement('a');
 
@@ -111,17 +124,18 @@ export default function Dashboard() {
   };
 
   // =========================================================
-  // DOWNLOAD DOCUMENT
+  // DOWNLOAD DOCUMENT (admin ka upload kiya hua PDF)
+  // Sirf wahi student download kar sakta hai jiski request hai
   // =========================================================
 
-  const downloadDocument = (requestId, documentType) => {
+  const downloadDocument = (requestId) => {
     const url =
-      `${NGROK_URL}/api/download/document/${requestId}/${documentType}`;
+      `${API_URL}/api/documents/download/${requestId}?studentId=${encodeURIComponent(studentId)}`;
 
     const link = document.createElement('a');
 
     link.href = url;
-    link.download = `${requestId}_${documentType}.txt`;
+    link.download = `${requestId}.pdf`;
 
     document.body.appendChild(link);
     link.click();
@@ -129,23 +143,31 @@ export default function Dashboard() {
   };
 
   // =========================================================
-  // CREATE QR FOR REQUEST
+  // QR: asli verification code backend se aata hai (DB mein save)
   // =========================================================
 
-  const generateAndShowQR = (requestId) => {
-    const timestamp = Date.now();
+  const generateAndShowQR = async (requestId) => {
+    try {
+      const res = await fetch(
+        `${API_URL}/api/certificate/code/${requestId}?studentId=${encodeURIComponent(studentId)}`
+      );
 
-    const verificationCode =
-      requestId +
-      '-' +
-      String(timestamp % 1000000).padStart(6, '0');
+      if (!res.ok) {
+        alert('QR code nahi ban paya. Request approved honi chahiye.');
+        return;
+      }
 
-    setSelectedQR({
-      requestId,
-      verificationCode
-    });
+      const data = await res.json();
 
-    setShowQRModal(true);
+      setSelectedQR({
+        requestId,
+        verificationCode: data.verificationCode
+      });
+
+      setShowQRModal(true);
+    } catch (e) {
+      alert('QR error: ' + e.message);
+    }
   };
 
   // =========================================================
@@ -153,8 +175,50 @@ export default function Dashboard() {
   // =========================================================
 
   const handleLogout = () => {
+    localStorage.removeItem('studentId');
+    localStorage.removeItem('role');
+    localStorage.removeItem('userType');
     window.location.href = '/';
   };
+
+  // =========================================================
+  // LOGIN NAHI HAI (redirect loop nahi, sirf message)
+  // =========================================================
+
+  if (!studentId) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#ffffff'
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ color: '#111827' }}>🔒 Login required</h2>
+          <p style={{ color: '#6b7280' }}>
+            Session nahi mila. Pehle login karo.
+          </p>
+          <button
+            onClick={() => { window.location.href = '/'; }}
+            style={{
+              background: '#1f2937',
+              color: '#ffffff',
+              border: 'none',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '0.375rem',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // =========================================================
   // CREATE REQUEST PAGE
@@ -163,7 +227,7 @@ export default function Dashboard() {
   if (showCreateForm) {
     return (
       <CreateRequestForm
-        studentId="TDIT065A"
+        studentId={studentId}
         onBack={() => {
           setShowCreateForm(false);
           fetchRequests();
@@ -232,7 +296,7 @@ export default function Dashboard() {
                 color: '#6b7280'
               }}
             >
-              Manage your document requests
+              Manage your document requests • {studentId}
             </p>
           </div>
 
@@ -407,28 +471,37 @@ export default function Dashboard() {
                             📜 Download Certificate
                           </button>
 
-                          {/* DOCUMENT */}
+                          {/* DOCUMENT (sirf jab admin ne PDF upload kiya ho) */}
 
-                          <button
-                            onClick={() =>
-                              downloadDocument(
-                                req.requestId,
-                                req.documentType
-                              )
-                            }
-                            style={{
-                              background: '#16a34a',
-                              color: '#ffffff',
-                              border: 'none',
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.375rem',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem'
-                            }}
-                          >
-                            ⬇️ Download Document
-                          </button>
+                          {req.fileName ? (
+                            <button
+                              onClick={() =>
+                                downloadDocument(req.requestId)
+                              }
+                              style={{
+                                background: '#16a34a',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '0.375rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                fontSize: '0.875rem'
+                              }}
+                            >
+                              ⬇️ Download Document
+                            </button>
+                          ) : (
+                            <span
+                              style={{
+                                color: '#92400e',
+                                fontSize: '0.875rem',
+                                alignSelf: 'center'
+                              }}
+                            >
+                              ⏳ Document upload hone ka wait karein
+                            </span>
+                          )}
 
                           {/* QR */}
 

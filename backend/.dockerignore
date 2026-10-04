@@ -1,0 +1,7 @@
+target
+config
+.git
+.idea
+.vscode
+backend-log.txt
+error.txt

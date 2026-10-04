@@ -28,17 +28,8 @@ public class Student {
     @Column(nullable = false)
     private String email;
     
-    // Constructors
-    public Student() {}
-    
-    public Student(String enrollment, String name, String password, String department, String semester, String email) {
-        this.enrollment = enrollment;
-        this.name = name;
-        this.password = password;
-        this.department = department;
-        this.semester = semester;
-        this.email = email;
-    }
+    @Column(name = "status", nullable = false)
+    private String status; // "current" or "alumni"
     
     // Getters & Setters
     public Long getId() { return id; }
@@ -61,4 +52,7 @@ public class Student {
     
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+    
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 }

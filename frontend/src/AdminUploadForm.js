@@ -14,7 +14,7 @@ export default function AdminUploadForm({ onBack }) {
     setMsg('');
 
     try {
-      const res = await fetch('http://localhost:8080/api/admin/upload', {
+      const res = await fetch('/api/admin/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, studentId, documentName, adminComment })
