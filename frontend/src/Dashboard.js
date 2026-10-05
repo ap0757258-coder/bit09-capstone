@@ -8,10 +8,14 @@ export default function Dashboard() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedQR, setSelectedQR] = useState(null);
 
-  const NGROK_URL = 'https://murky-rimmed-legend.ngrok-free.dev';
-  const API_URL = '';
+  // Production Backend URL
+  const API_URL = 'https://docverify-asdt.onrender.com';
 
-  // Login ke baad jo ID save hui hai wahi use hogi
+  // Current frontend URL
+  // Production mein QR isi frontend URL par jayega.
+  const PUBLIC_URL = window.location.origin;
+
+  // Login ke baad jo student ID save hui hai wahi use hogi
   const studentId = localStorage.getItem('studentId');
 
   useEffect(() => {
@@ -19,6 +23,7 @@ export default function Dashboard() {
       setLoading(false);
       return;
     }
+
     fetchRequests();
   }, []);
 
@@ -28,22 +33,36 @@ export default function Dashboard() {
     }
   }, [showQRModal, selectedQR]);
 
+  // =========================================================
+  // FETCH STUDENT REQUESTS
+  // =========================================================
+
   const fetchRequests = async () => {
     try {
       const res = await fetch(
         `${API_URL}/api/documents/student/${studentId}`
       );
 
+      if (!res.ok) {
+        throw new Error(`Failed to load requests: ${res.status}`);
+      }
+
       const data = await res.json();
+
       setRequests(Array.isArray(data) ? data : []);
     } catch (e) {
       console.log('Error:', e);
+      setRequests([]);
     }
 
     setLoading(false);
   };
 
-  const getDocIcon = (doc) => {
+  // =========================================================
+  // DOCUMENT ICON
+  // =========================================================
+
+  const getDocIcon = (doc = '') => {
     if (doc.includes('Bonafide')) return '📄';
     if (doc.includes('Transcript')) return '📋';
     if (doc.includes('Character')) return '🎓';
@@ -62,7 +81,6 @@ export default function Dashboard() {
 
   // =========================================================
   // QR CODE GENERATION
-  // (QR phone se scan hota hai, isliye ye ngrok URL par hi rahega)
   // =========================================================
 
   const generateQRCode = async () => {
@@ -72,8 +90,10 @@ export default function Dashboard() {
       if (container && selectedQR) {
         container.innerHTML = '';
 
+        // QR will open the FRONTEND verification page.
+        // Ngrok is no longer used.
         const verificationUrl =
-          `${NGROK_URL}/verify/${selectedQR.verificationCode}`;
+          `${PUBLIC_URL}/verify/${selectedQR.verificationCode}`;
 
         console.log('QR URL:', verificationUrl);
 
@@ -106,7 +126,7 @@ export default function Dashboard() {
   };
 
   // =========================================================
-  // DOWNLOAD CERTIFICATE (localhost se, ngrok nahi chahiye)
+  // DOWNLOAD CERTIFICATE
   // =========================================================
 
   const downloadCertificate = (requestId) => {
@@ -124,13 +144,14 @@ export default function Dashboard() {
   };
 
   // =========================================================
-  // DOWNLOAD DOCUMENT (admin ka upload kiya hua PDF)
-  // Sirf wahi student download kar sakta hai jiski request hai
+  // DOWNLOAD DOCUMENT
   // =========================================================
 
   const downloadDocument = (requestId) => {
     const url =
-      `${API_URL}/api/documents/download/${requestId}?studentId=${encodeURIComponent(studentId)}`;
+      `${API_URL}/api/documents/download/${requestId}?studentId=${encodeURIComponent(
+        studentId
+      )}`;
 
     const link = document.createElement('a');
 
@@ -143,17 +164,21 @@ export default function Dashboard() {
   };
 
   // =========================================================
-  // QR: asli verification code backend se aata hai (DB mein save)
+  // GET VERIFICATION CODE AND SHOW QR
   // =========================================================
 
   const generateAndShowQR = async (requestId) => {
     try {
       const res = await fetch(
-        `${API_URL}/api/certificate/code/${requestId}?studentId=${encodeURIComponent(studentId)}`
+        `${API_URL}/api/certificate/code/${requestId}?studentId=${encodeURIComponent(
+          studentId
+        )}`
       );
 
       if (!res.ok) {
-        alert('QR code nahi ban paya. Request approved honi chahiye.');
+        alert(
+          'QR code nahi ban paya. Request approved honi chahiye.'
+        );
         return;
       }
 
@@ -178,11 +203,12 @@ export default function Dashboard() {
     localStorage.removeItem('studentId');
     localStorage.removeItem('role');
     localStorage.removeItem('userType');
+
     window.location.href = '/';
   };
 
   // =========================================================
-  // LOGIN NAHI HAI (redirect loop nahi, sirf message)
+  // LOGIN REQUIRED
   // =========================================================
 
   if (!studentId) {
@@ -197,12 +223,18 @@ export default function Dashboard() {
         }}
       >
         <div style={{ textAlign: 'center' }}>
-          <h2 style={{ color: '#111827' }}>🔒 Login required</h2>
+          <h2 style={{ color: '#111827' }}>
+            🔒 Login required
+          </h2>
+
           <p style={{ color: '#6b7280' }}>
             Session nahi mila. Pehle login karo.
           </p>
+
           <button
-            onClick={() => { window.location.href = '/'; }}
+            onClick={() => {
+              window.location.href = '/';
+            }}
             style={{
               background: '#1f2937',
               color: '#ffffff',
@@ -471,7 +503,7 @@ export default function Dashboard() {
                             📜 Download Certificate
                           </button>
 
-                          {/* DOCUMENT (sirf jab admin ne PDF upload kiya ho) */}
+                          {/* DOCUMENT */}
 
                           {req.fileName ? (
                             <button
