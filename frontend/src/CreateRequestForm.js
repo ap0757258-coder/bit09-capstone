@@ -1,800 +1,439 @@
 import React, { useState, useEffect } from 'react';
-import CreateRequestForm from './CreateRequestForm';
 
-export default function Dashboard() {
-  const [requests, setRequests] = useState([]);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [showQRModal, setShowQRModal] = useState(false);
-  const [selectedQR, setSelectedQR] = useState(null);
-  const [qrLink, setQrLink] = useState('');
+const API_URL =
+  process.env.REACT_APP_API_URL || 'https://docverify-asdt.onrender.com';
 
-  // Backup link (agar backend se public link na mile)
-  const NGROK_URL = 'https://murky-rimmed-legend.ngrok-free.dev';
-  const API_URL = '';
-
-  // Login ke baad jo ID save hui hai wahi use hogi
-  const studentId = localStorage.getItem('studentId');
+export default function CreateRequest({ onBack, studentId }) {
+  const [docType, setDocType] = useState('');
+  const [purpose, setPurpose] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
 
   useEffect(() => {
+    console.log('CREATE FORM MOUNTED');
+    console.log('Student ID:', studentId);
+
+    return () => {
+      console.log('CREATE FORM UNMOUNTED');
+    };
+  }, [studentId]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    console.log('CREATE REQUEST SUBMIT CLICKED');
+    console.log('Student ID being sent:', studentId);
+
     if (!studentId) {
-      setLoading(false);
+      setMsg('❌ Student ID not found. Please login again.');
       return;
     }
-    fetchRequests();
-  }, []);
 
-  useEffect(() => {
-    if (showQRModal && selectedQR) {
-      generateQRCode();
-    }
-  }, [showQRModal, selectedQR]);
+    setLoading(true);
+    setMsg('');
 
-  const fetchRequests = async () => {
     try {
-      const res = await fetch(
-        `${API_URL}/api/documents/student/${studentId}`
+      const res = await fetch(`${API_URL}/api/create-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          studentId: studentId,
+          documentType: docType,
+          purpose: purpose
+        })
+      });
+
+      console.log(
+        'Create request response status:',
+        res.status
       );
 
       const data = await res.json();
-      setRequests(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.log('Error:', e);
+
+      console.log(
+        'Create request response:',
+        data
+      );
+
+      if (data.status === 'success') {
+        setMsg('✅ Request created successfully');
+
+        setTimeout(() => {
+          if (onBack) {
+            onBack();
+          }
+        }, 1200);
+      } else {
+        setMsg(
+          '❌ ' +
+            (data.message ||
+              'Request creation failed')
+        );
+      }
+    } catch (error) {
+      console.error(
+        'Create request error:',
+        error
+      );
+
+      setMsg(
+        '❌ Error: ' + error.message
+      );
     }
 
     setLoading(false);
   };
 
-  const getDocIcon = (doc) => {
-    if (doc.includes('Bonafide')) return '📄';
-    if (doc.includes('Transcript')) return '📋';
-    if (doc.includes('Character')) return '🎓';
-    if (doc.includes('Marksheet')) return '📊';
-    if (doc.includes('Leaving')) return '🏫';
-    if (doc.includes('Migration')) return '✈️';
-    if (doc.includes('Degree')) return '🎖️';
-    if (doc.includes('Provisional')) return '📝';
-    if (doc.includes('Objection')) return '✔️';
-    if (doc.includes('Fee')) return '💰';
-    if (doc.includes('Gap')) return '⏳';
-    if (doc.includes('Attendance')) return '📅';
-
-    return '📑';
-  };
-
-  // =========================================================
-  // QR CODE GENERATION
-  // Public link backend ki app.public-url setting se aata hai
-  // =========================================================
-
-  const generateQRCode = async () => {
-    try {
-      const container = document.getElementById('qr-code-container');
-
-      if (container && selectedQR) {
-        container.innerHTML = '';
-
-        let base = NGROK_URL;
-
-        try {
-          const cfgRes = await fetch(`${API_URL}/api/config`);
-          const cfg = await cfgRes.json();
-          if (cfg.publicUrl) {
-            base = cfg.publicUrl;
-          }
-        } catch (e) {
-          console.log('Config error:', e);
-        }
-
-        const verificationUrl =
-          `${base}/verify/${selectedQR.verificationCode}`;
-
-        setQrLink(verificationUrl);
-
-        const qrApiUrl =
-          `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-            verificationUrl
-          )}`;
-
-        const img = document.createElement('img');
-
-        img.src = qrApiUrl;
-        img.alt = 'QR Code';
-        img.style.width = '200px';
-        img.style.height = '200px';
-        img.style.border = '2px solid #000';
-
-        container.innerHTML = '';
-        container.appendChild(img);
-      }
-    } catch (e) {
-      console.error('QR Code Error:', e);
-
-      const container =
-        document.getElementById('qr-code-container');
-
-      if (container) {
-        container.innerHTML =
-          '<p style="color: #dc2626;">QR Code generation failed</p>';
-      }
-    }
-  };
-
-  // =========================================================
-  // DOWNLOAD CERTIFICATE (localhost se)
-  // =========================================================
-
-  const downloadCertificate = (requestId) => {
-    const url =
-      `${API_URL}/api/certificate/download/${requestId}`;
-
-    const link = document.createElement('a');
-
-    link.href = url;
-    link.download = `${requestId}_Certificate.pdf`;
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // =========================================================
-  // DOWNLOAD DOCUMENT (admin ka upload kiya hua PDF)
-  // Sirf wahi student download kar sakta hai jiski request hai
-  // =========================================================
-
-  const downloadDocument = (requestId) => {
-    const url =
-      `${API_URL}/api/documents/download/${requestId}?studentId=${encodeURIComponent(studentId)}`;
-
-    const link = document.createElement('a');
-
-    link.href = url;
-    link.download = `${requestId}.pdf`;
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // =========================================================
-  // QR: asli verification code backend se aata hai (DB mein save)
-  // =========================================================
-
-  const generateAndShowQR = async (requestId) => {
-    try {
-      const res = await fetch(
-        `${API_URL}/api/certificate/code/${requestId}?studentId=${encodeURIComponent(studentId)}`
-      );
-
-      if (!res.ok) {
-        alert('QR code nahi ban paya. Request approved honi chahiye.');
-        return;
-      }
-
-      const data = await res.json();
-
-      setQrLink('');
-      setSelectedQR({
-        requestId,
-        verificationCode: data.verificationCode
-      });
-
-      setShowQRModal(true);
-    } catch (e) {
-      alert('QR error: ' + e.message);
-    }
-  };
-
-  // =========================================================
-  // LOGOUT
-  // =========================================================
-
-  const handleLogout = () => {
-    localStorage.removeItem('studentId');
-    localStorage.removeItem('role');
-    localStorage.removeItem('userType');
-    window.location.href = '/';
-  };
-
-  // =========================================================
-  // LOGIN NAHI HAI (redirect loop nahi, sirf message)
-  // =========================================================
-
-  if (!studentId) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#ffffff'
-        }}
-      >
-        <div style={{ textAlign: 'center' }}>
-          <h2 style={{ color: '#111827' }}>🔒 Login required</h2>
-          <p style={{ color: '#6b7280' }}>
-            Session nahi mila. Pehle login karo.
-          </p>
-          <button
-            onClick={() => { window.location.href = '/'; }}
-            style={{
-              background: '#1f2937',
-              color: '#ffffff',
-              border: 'none',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '0.375rem',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // =========================================================
-  // CREATE REQUEST PAGE
-  // =========================================================
-
-  if (showCreateForm) {
-    return (
-      <CreateRequestForm
-        studentId={studentId}
-        onBack={() => {
-          setShowCreateForm(false);
-          fetchRequests();
-        }}
-      />
-    );
-  }
-
-  // =========================================================
-  // STATUS COLOR
-  // =========================================================
-
-  const getStatusColor = (status) => {
-    if (status === 'approved') return '#16a34a';
-    if (status === 'rejected') return '#dc2626';
-
-    return '#ca8a04';
-  };
-
-  // =========================================================
-  // DASHBOARD UI
-  // =========================================================
-
   return (
     <div
       style={{
         minHeight: '100vh',
-        background: '#ffffff',
-        padding: '2rem 1rem'
+        background: '#f3f6fb',
+        padding: '30px'
       }}
     >
       <div
         style={{
-          maxWidth: '1000px',
+          maxWidth: '900px',
           margin: '0 auto'
         }}
       >
 
-        {/* HEADER */}
-
+        {/* ==================================================
+            HEADER
+        ================================================== */}
         <div
           style={{
-            borderBottom: '2px solid #e5e7eb',
-            paddingBottom: '2rem',
-            marginBottom: '2rem',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
+            background:
+              'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '0 0 24px 24px',
+            padding: '30px 40px',
+            color: '#fff',
+            boxShadow:
+              '0 15px 40px rgba(102,126,234,0.25)',
+            marginBottom: '30px'
           }}
         >
-          <div>
-            <h1
-              style={{
-                margin: '0',
-                fontSize: '2rem',
-                color: '#111827',
-                fontWeight: '700'
-              }}
-            >
-              Dashboard
-            </h1>
-
-            <p
-              style={{
-                margin: '0.5rem 0 0 0',
-                color: '#6b7280'
-              }}
-            >
-              Manage your document requests • {studentId}
-            </p>
-          </div>
-
           <button
-            onClick={handleLogout}
+            type="button"
+            onClick={() => {
+              if (onBack) {
+                onBack();
+              }
+            }}
             style={{
-              background: '#ef4444',
-              color: '#ffffff',
+              padding: '10px 18px',
               border: 'none',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '0.375rem',
-              fontWeight: '600',
-              cursor: 'pointer'
+              borderRadius: '9px',
+              background:
+                'rgba(255,255,255,0.95)',
+              color: '#667eea',
+              fontSize: '15px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              marginBottom: '22px'
             }}
           >
-            Logout
+            ← Back
           </button>
-        </div>
-
-        {/* REQUESTS */}
-
-        <div style={{ marginBottom: '2rem' }}>
-
-          <h2
-            style={{
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              color: '#1f2937',
-              marginBottom: '1.5rem'
-            }}
-          >
-            Your Requests
-          </h2>
-
-          {loading ? (
-            <p style={{ color: '#6b7280' }}>
-              Loading...
-            </p>
-          ) : requests.length === 0 ? (
-            <p style={{ color: '#6b7280' }}>
-              No requests yet
-            </p>
-          ) : (
-            <div
-              style={{
-                display: 'grid',
-                gap: '1rem'
-              }}
-            >
-
-              {requests.map((req, i) => (
-                <div
-                  key={i}
-                  style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    padding: '1.5rem'
-                  }}
-                >
-
-                  {/* REQUEST HEADER */}
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'start'
-                    }}
-                  >
-
-                    <div>
-
-                      <h3
-                        style={{
-                          margin: '0',
-                          fontSize: '1.1rem',
-                          color: '#1f2937',
-                          fontWeight: '600'
-                        }}
-                      >
-                        {getDocIcon(req.documentType)}{' '}
-                        {req.documentType}
-                      </h3>
-
-                      <p
-                        style={{
-                          margin: '0.25rem 0 0 0',
-                          fontSize: '0.875rem',
-                          color: '#6b7280'
-                        }}
-                      >
-                        {req.requestId} • {req.createdDate}
-                      </p>
-
-                    </div>
-
-                    <div
-                      style={{
-                        background: getStatusColor(req.status),
-                        color: '#ffffff',
-                        padding: '0.375rem 0.75rem',
-                        borderRadius: '0.25rem',
-                        fontSize: '0.875rem',
-                        fontWeight: '600'
-                      }}
-                    >
-                      {req.status.toUpperCase()}
-                    </div>
-
-                  </div>
-
-                  {/* PURPOSE */}
-
-                  <div
-                    style={{
-                      marginTop: '0.75rem',
-                      paddingTop: '0.75rem',
-                      borderTop: '1px solid #e5e7eb'
-                    }}
-                  >
-                    <p
-                      style={{
-                        margin: '0',
-                        fontSize: '0.875rem',
-                        color: '#6b7280'
-                      }}
-                    >
-                      Purpose: {req.purpose}
-                    </p>
-                  </div>
-
-                  {/* ACTIONS */}
-
-                  <div
-                    style={{
-                      marginTop: '1rem',
-                      paddingTop: '1rem',
-                      borderTop: '1px solid #e5e7eb'
-                    }}
-                  >
-
-                    {req.status === 'approved' ? (
-
-                      <div>
-
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: '0.5rem',
-                            marginBottom: '0.5rem',
-                            flexWrap: 'wrap'
-                          }}
-                        >
-
-                          {/* CERTIFICATE */}
-
-                          <button
-                            onClick={() =>
-                              downloadCertificate(req.requestId)
-                            }
-                            style={{
-                              background: '#2563eb',
-                              color: '#ffffff',
-                              border: 'none',
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.375rem',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem'
-                            }}
-                          >
-                            📜 Download Certificate
-                          </button>
-
-                          {/* DOCUMENT (sirf jab admin ne PDF upload kiya ho) */}
-
-                          {req.fileName ? (
-                            <button
-                              onClick={() =>
-                                downloadDocument(req.requestId)
-                              }
-                              style={{
-                                background: '#16a34a',
-                                color: '#ffffff',
-                                border: 'none',
-                                padding: '0.5rem 1rem',
-                                borderRadius: '0.375rem',
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                                fontSize: '0.875rem'
-                              }}
-                            >
-                              ⬇️ Download Document
-                            </button>
-                          ) : (
-                            <span
-                              style={{
-                                color: '#92400e',
-                                fontSize: '0.875rem',
-                                alignSelf: 'center'
-                              }}
-                            >
-                              ⏳ Document upload hone ka wait karein
-                            </span>
-                          )}
-
-                          {/* QR */}
-
-                          <button
-                            onClick={() =>
-                              generateAndShowQR(req.requestId)
-                            }
-                            style={{
-                              background: '#f59e0b',
-                              color: '#ffffff',
-                              border: 'none',
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.375rem',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem'
-                            }}
-                          >
-                            📱 View QR
-                          </button>
-
-                        </div>
-
-                        <p
-                          style={{
-                            margin: '0',
-                            fontSize: '0.75rem',
-                            color: '#9ca3af'
-                          }}
-                        >
-                          Certificate includes QR code for verification
-                        </p>
-
-                      </div>
-
-                    ) : req.status === 'rejected' ? (
-
-                      <button
-                        style={{
-                          background: '#dc2626',
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '0.5rem 1rem',
-                          borderRadius: '0.375rem',
-                          fontWeight: '600',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Resubmit
-                      </button>
-
-                    ) : (
-
-                      <span
-                        style={{
-                          color: '#9ca3af',
-                          fontSize: '0.875rem'
-                        }}
-                      >
-                        ⏳ Pending review by admin
-                      </span>
-
-                    )}
-
-                  </div>
-
-                </div>
-              ))}
-
-            </div>
-          )}
-
-        </div>
-
-        {/* NEW REQUEST */}
-
-        <div
-          style={{
-            display: 'flex',
-            gap: '1rem',
-            paddingTop: '2rem',
-            borderTop: '1px solid #e5e7eb'
-          }}
-        >
-
-          <button
-            onClick={() => setShowCreateForm(true)}
-            style={{
-              background: '#1f2937',
-              color: '#ffffff',
-              border: 'none',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '0.375rem',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            📝 New Request
-          </button>
-
-        </div>
-
-        {/* =====================================================
-            QR MODAL
-        ===================================================== */}
-
-        {showQRModal && selectedQR && (
 
           <div
             style={{
-              position: 'fixed',
-              top: '0',
-              left: '0',
-              right: '0',
-              bottom: '0',
-              background: 'rgba(0,0,0,0.7)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: '9999'
+              fontSize: '38px',
+              marginBottom: '5px'
             }}
           >
-
-            <div
-              style={{
-                background: '#ffffff',
-                padding: '2rem',
-                borderRadius: '0.75rem',
-                maxWidth: '500px',
-                width: '90%'
-              }}
-            >
-
-              {/* MODAL HEADER */}
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '1rem'
-                }}
-              >
-
-                <h2
-                  style={{
-                    margin: '0',
-                    color: '#111827',
-                    fontWeight: '600'
-                  }}
-                >
-                  Document QR Code
-                </h2>
-
-                <button
-                  onClick={() => setShowQRModal(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '1.5rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  ×
-                </button>
-
-              </div>
-
-              {/* QR AREA */}
-
-              <div
-                style={{
-                  textAlign: 'center',
-                  padding: '2rem',
-                  background: '#f3f4f6',
-                  borderRadius: '0.5rem'
-                }}
-              >
-
-                <h3
-                  style={{
-                    margin: '0 0 1rem 0',
-                    color: '#1f2937',
-                    fontWeight: '600'
-                  }}
-                >
-                  📱 Scan for Verification
-                </h3>
-
-                <div
-                  style={{
-                    background: '#ffffff',
-                    padding: '1.5rem',
-                    borderRadius: '0.5rem',
-                    display: 'inline-block',
-                    marginBottom: '1rem'
-                  }}
-                >
-
-                  <div
-                    id="qr-code-container"
-                    style={{
-                      textAlign: 'center',
-                      minHeight: '200px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <p style={{ color: '#6b7280' }}>
-                      Generating QR Code...
-                    </p>
-                  </div>
-
-                </div>
-
-                {/* VERIFICATION CODE */}
-
-                <div style={{ marginTop: '1rem' }}>
-
-                  <p
-                    style={{
-                      margin: '0 0 0.5rem 0',
-                      color: '#6b7280',
-                      fontSize: '0.875rem'
-                    }}
-                  >
-                    Verification Code:
-                  </p>
-
-                  <p
-                    style={{
-                      margin: '0',
-                      color: '#1f2937',
-                      fontWeight: '600',
-                      wordBreak: 'break-all',
-                      fontSize: '0.95rem'
-                    }}
-                  >
-                    {selectedQR.verificationCode}
-                  </p>
-
-                </div>
-
-                {/* QR LINK (check karne ke liye) */}
-
-                {qrLink && (
-                  <p
-                    style={{
-                      margin: '1rem 0 0 0',
-                      color: '#6b7280',
-                      fontSize: '0.7rem',
-                      wordBreak: 'break-all'
-                    }}
-                  >
-                    Link: {qrLink}
-                  </p>
-                )}
-
-                <p
-                  style={{
-                    margin: '1rem 0 0 0',
-                    color: '#9ca3af',
-                    fontSize: '0.75rem'
-                  }}
-                >
-                  Scan with your phone camera to verify authenticity
-                </p>
-
-              </div>
-
-            </div>
-
+            📝
           </div>
 
-        )}
+          <h1
+            style={{
+              margin: 0,
+              fontSize: '36px',
+              fontWeight: '700'
+            }}
+          >
+            New Request
+          </h1>
 
+          <p
+            style={{
+              margin:
+                '8px 0 0',
+              fontSize: '18px',
+              color: '#e0e7ff'
+            }}
+          >
+            Request a new document
+          </p>
+
+          <p
+            style={{
+              margin:
+                '7px 0 0',
+              fontSize: '15px',
+              color: '#ddd6fe'
+            }}
+          >
+            Student ID:{' '}
+            <strong>{studentId}</strong>
+          </p>
+        </div>
+
+        {/* ==================================================
+            FORM CARD
+        ================================================== */}
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            background: '#fff',
+            borderRadius: '18px',
+            padding: '35px',
+            boxShadow:
+              '0 5px 25px rgba(0,0,0,0.07)'
+          }}
+        >
+
+          {/* FORM TITLE */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: '30px'
+            }}
+          >
+            <span
+              style={{
+                fontSize: '28px'
+              }}
+            >
+              📄
+            </span>
+
+            <div>
+              <h2
+                style={{
+                  margin: 0,
+                  color: '#172033',
+                  fontSize: '25px'
+                }}
+              >
+                Document Details
+              </h2>
+
+              <p
+                style={{
+                  margin:
+                    '5px 0 0',
+                  color: '#64748b',
+                  fontSize: '14px'
+                }}
+              >
+                Select the document you want to request
+              </p>
+            </div>
+          </div>
+
+          {/* ==================================================
+              DOCUMENT TYPE
+          ================================================== */}
+          <div
+            style={{
+              marginBottom: '25px'
+            }}
+          >
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '9px',
+                fontWeight: '700',
+                color: '#172033',
+                fontSize: '16px'
+              }}
+            >
+              📋 Document Type
+            </label>
+
+            <select
+              value={docType}
+              onChange={(e) =>
+                setDocType(e.target.value)
+              }
+              required
+              style={{
+                width: '100%',
+                padding: '14px 15px',
+                border:
+                  '1px solid #d1d5db',
+                borderRadius: '10px',
+                fontSize: '16px',
+                background: '#fff',
+                color: '#172033',
+                boxSizing: 'border-box',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="">
+                Select document...
+              </option>
+
+              <option value="Bonafide Letter">
+                Bonafide Letter
+              </option>
+
+              <option value="Transcript">
+                Transcript
+              </option>
+
+              <option value="Character Certificate">
+                Character Certificate
+              </option>
+
+              <option value="12th Marksheet">
+                12th Marksheet
+              </option>
+
+              <option value="Leaving Certificate">
+                Leaving Certificate
+              </option>
+
+              <option value="Migration Certificate">
+                Migration Certificate
+              </option>
+
+              <option value="Degree Certificate">
+                Degree Certificate
+              </option>
+
+              <option value="Provisional Certificate">
+                Provisional Certificate
+              </option>
+
+              <option value="No Objection Certificate">
+                No Objection Certificate (NOC)
+              </option>
+
+              <option value="Fee Receipt">
+                Fee Receipt
+              </option>
+
+              <option value="Gap Certificate">
+                Gap Certificate
+              </option>
+
+              <option value="Attendance Certificate">
+                Attendance Certificate
+              </option>
+            </select>
+          </div>
+
+          {/* ==================================================
+              PURPOSE
+          ================================================== */}
+          <div
+            style={{
+              marginBottom: '25px'
+            }}
+          >
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '9px',
+                fontWeight: '700',
+                color: '#172033',
+                fontSize: '16px'
+              }}
+            >
+              📌 Purpose
+            </label>
+
+            <textarea
+              value={purpose}
+              onChange={(e) =>
+                setPurpose(e.target.value)
+              }
+              placeholder="Why do you need this document?"
+              required
+              rows="6"
+              style={{
+                width: '100%',
+                padding: '14px 15px',
+                border:
+                  '1px solid #d1d5db',
+                borderRadius: '10px',
+                fontSize: '16px',
+                resize: 'vertical',
+                boxSizing: 'border-box',
+                fontFamily: 'inherit',
+                color: '#172033',
+                outline: 'none'
+              }}
+            />
+          </div>
+
+          {/* ==================================================
+              MESSAGE
+          ================================================== */}
+          {msg && (
+            <div
+              style={{
+                marginBottom: '22px',
+                padding: '14px 16px',
+                borderRadius: '10px',
+                background:
+                  msg.startsWith('✅')
+                    ? '#d1fae5'
+                    : '#fee2e2',
+                color:
+                  msg.startsWith('✅')
+                    ? '#047857'
+                    : '#b91c1c',
+                border:
+                  msg.startsWith('✅')
+                    ? '1px solid #6ee7b7'
+                    : '1px solid #fca5a5',
+                fontWeight: '600'
+              }}
+            >
+              {msg}
+            </div>
+          )}
+
+          {/* ==================================================
+              SUBMIT
+          ================================================== */}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '15px',
+              border: 'none',
+              borderRadius: '10px',
+              background: loading
+                ? '#9ca3af'
+                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: '#fff',
+              fontSize: '17px',
+              fontWeight: '700',
+              cursor: loading
+                ? 'not-allowed'
+                : 'pointer',
+              boxShadow: loading
+                ? 'none'
+                : '0 6px 18px rgba(102,126,234,0.25)'
+            }}
+          >
+            {loading
+              ? '⏳ Creating...'
+              : '✓ Create Request'}
+          </button>
+
+        </form>
       </div>
     </div>
   );
