@@ -1,22 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import CreateRequestForm from './CreateRequestForm';
 
+// =========================================================
+// PRODUCTION BACKEND
+// =========================================================
+const API_URL =
+  process.env.REACT_APP_API_URL || 'https://docverify-asdt.onrender.com';
+
 export default function Dashboard() {
   const [requests, setRequests] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedQR, setSelectedQR] = useState(null);
+  const [qrLink, setQrLink] = useState('');
 
-  // Production Backend URL
-  const API_URL = 'https://docverify-asdt.onrender.com';
-
-  // Current frontend URL
-  // Production mein QR isi frontend URL par jayega.
-  const PUBLIC_URL = window.location.origin;
-
-  // Login ke baad jo student ID save hui hai wahi use hogi
+  // Login ke baad jo student ID save hui hai
   const studentId = localStorage.getItem('studentId');
+
+  // =========================================================
+  // FETCH STUDENT REQUESTS
+  // =========================================================
 
   useEffect(() => {
     if (!studentId) {
@@ -25,17 +29,17 @@ export default function Dashboard() {
     }
 
     fetchRequests();
-  }, []);
+  }, [studentId]);
+
+  // =========================================================
+  // QR GENERATION
+  // =========================================================
 
   useEffect(() => {
     if (showQRModal && selectedQR) {
       generateQRCode();
     }
   }, [showQRModal, selectedQR]);
-
-  // =========================================================
-  // FETCH STUDENT REQUESTS
-  // =========================================================
 
   const fetchRequests = async () => {
     try {
@@ -44,14 +48,14 @@ export default function Dashboard() {
       );
 
       if (!res.ok) {
-        throw new Error(`Failed to load requests: ${res.status}`);
+        throw new Error('Failed to fetch requests');
       }
 
       const data = await res.json();
 
       setRequests(Array.isArray(data) ? data : []);
     } catch (e) {
-      console.log('Error:', e);
+      console.error('Error fetching requests:', e);
       setRequests([]);
     }
 
@@ -81,37 +85,49 @@ export default function Dashboard() {
 
   // =========================================================
   // QR CODE GENERATION
+  //
+  // QR FRONTEND URL PAR POINT KAREGA
+  // Example:
+  // https://your-frontend.onrender.com/verify/REQ-001-XXXXXXXXXX
+  //
+  // Verification page us code ko backend par verify karega.
   // =========================================================
 
   const generateQRCode = async () => {
     try {
       const container = document.getElementById('qr-code-container');
 
-      if (container && selectedQR) {
-        container.innerHTML = '';
-
-        // QR will open the FRONTEND verification page.
-        // Ngrok is no longer used.
-        const verificationUrl =
-          `${PUBLIC_URL}/verify/${selectedQR.verificationCode}`;
-
-        console.log('QR URL:', verificationUrl);
-
-        const qrApiUrl =
-          `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-            verificationUrl
-          )}`;
-
-        const img = document.createElement('img');
-
-        img.src = qrApiUrl;
-        img.alt = 'QR Code';
-        img.style.width = '200px';
-        img.style.height = '200px';
-        img.style.border = '2px solid #000';
-
-        container.appendChild(img);
+      if (!container || !selectedQR) {
+        return;
       }
+
+      container.innerHTML = '';
+
+      // Current deployed frontend URL
+      const frontendBaseUrl = window.location.origin;
+
+      const verificationUrl =
+        `${frontendBaseUrl}/verify/${selectedQR.verificationCode}`;
+
+      setQrLink(verificationUrl);
+
+      // QR Server API
+      const qrApiUrl =
+        `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+          verificationUrl
+        )}`;
+
+      const img = document.createElement('img');
+
+      img.src = qrApiUrl;
+      img.alt = 'QR Code';
+      img.style.width = '200px';
+      img.style.height = '200px';
+      img.style.border = '2px solid #000';
+
+      container.innerHTML = '';
+      container.appendChild(img);
+
     } catch (e) {
       console.error('QR Code Error:', e);
 
@@ -144,7 +160,7 @@ export default function Dashboard() {
   };
 
   // =========================================================
-  // DOWNLOAD DOCUMENT
+  // DOWNLOAD ADMIN UPLOADED DOCUMENT
   // =========================================================
 
   const downloadDocument = (requestId) => {
@@ -164,7 +180,7 @@ export default function Dashboard() {
   };
 
   // =========================================================
-  // GET VERIFICATION CODE AND SHOW QR
+  // GET VERIFICATION CODE FROM BACKEND
   // =========================================================
 
   const generateAndShowQR = async (requestId) => {
@@ -184,13 +200,17 @@ export default function Dashboard() {
 
       const data = await res.json();
 
+      setQrLink('');
+
       setSelectedQR({
         requestId,
         verificationCode: data.verificationCode
       });
 
       setShowQRModal(true);
+
     } catch (e) {
+      console.error('QR error:', e);
       alert('QR error: ' + e.message);
     }
   };
@@ -223,6 +243,7 @@ export default function Dashboard() {
         }}
       >
         <div style={{ textAlign: 'center' }}>
+
           <h2 style={{ color: '#111827' }}>
             🔒 Login required
           </h2>
@@ -247,6 +268,7 @@ export default function Dashboard() {
           >
             Go to Login
           </button>
+
         </div>
       </div>
     );
@@ -310,7 +332,9 @@ export default function Dashboard() {
             alignItems: 'center'
           }}
         >
+
           <div>
+
             <h1
               style={{
                 margin: '0',
@@ -330,6 +354,7 @@ export default function Dashboard() {
             >
               Manage your document requests • {studentId}
             </p>
+
           </div>
 
           <button
@@ -346,6 +371,7 @@ export default function Dashboard() {
           >
             Logout
           </button>
+
         </div>
 
         {/* REQUESTS */}
@@ -364,14 +390,19 @@ export default function Dashboard() {
           </h2>
 
           {loading ? (
+
             <p style={{ color: '#6b7280' }}>
               Loading...
             </p>
+
           ) : requests.length === 0 ? (
+
             <p style={{ color: '#6b7280' }}>
               No requests yet
             </p>
+
           ) : (
+
             <div
               style={{
                 display: 'grid',
@@ -380,6 +411,7 @@ export default function Dashboard() {
             >
 
               {requests.map((req, i) => (
+
                 <div
                   key={i}
                   style={{
@@ -435,7 +467,7 @@ export default function Dashboard() {
                         fontWeight: '600'
                       }}
                     >
-                      {req.status.toUpperCase()}
+                      {(req.status || 'pending').toUpperCase()}
                     </div>
 
                   </div>
@@ -449,6 +481,7 @@ export default function Dashboard() {
                       borderTop: '1px solid #e5e7eb'
                     }}
                   >
+
                     <p
                       style={{
                         margin: '0',
@@ -458,6 +491,7 @@ export default function Dashboard() {
                     >
                       Purpose: {req.purpose}
                     </p>
+
                   </div>
 
                   {/* ACTIONS */}
@@ -506,6 +540,7 @@ export default function Dashboard() {
                           {/* DOCUMENT */}
 
                           {req.fileName ? (
+
                             <button
                               onClick={() =>
                                 downloadDocument(req.requestId)
@@ -523,7 +558,9 @@ export default function Dashboard() {
                             >
                               ⬇️ Download Document
                             </button>
+
                           ) : (
+
                             <span
                               style={{
                                 color: '#92400e',
@@ -533,6 +570,7 @@ export default function Dashboard() {
                             >
                               ⏳ Document upload hone ka wait karein
                             </span>
+
                           )}
 
                           {/* QR */}
@@ -601,9 +639,11 @@ export default function Dashboard() {
                   </div>
 
                 </div>
+
               ))}
 
             </div>
+
           )}
 
         </div>
@@ -777,6 +817,23 @@ export default function Dashboard() {
                   </p>
 
                 </div>
+
+                {/* QR LINK */}
+
+                {qrLink && (
+
+                  <p
+                    style={{
+                      margin: '1rem 0 0 0',
+                      color: '#6b7280',
+                      fontSize: '0.7rem',
+                      wordBreak: 'break-all'
+                    }}
+                  >
+                    Link: {qrLink}
+                  </p>
+
+                )}
 
                 <p
                   style={{
